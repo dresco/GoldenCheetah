@@ -43,8 +43,8 @@ static DeviceType SupportedDevices[] =
         "Racermate Computrainer Lab or Pro bike trainer with the handlebar controller "
         "connected via a USB adaptor or directly connected to a local serial port." ,
         ":images/devices/computrainer.png"                                        },
-      { DEV_BUDGET,   DEV_SERIAL,  (char *) "Homebrew Budget Trainer",true,    false,
-        "Hoembrew Budget Trainer interface for mag turbo control "
+      { DEV_BUDGET,   DEV_SERIAL,  (char *) "Homebrew BudgetTrainer",true,    false,
+        "Homebrew BudgetTrainer interface for magnetic turbo resistance control, "
         "connected via a USB adaptor or directly connected to a local serial port." ,
         ":images/devices/computrainer.png"                                        },   // FIXME: add a real icon
 #ifdef GC_HAVE_LIBUSB
