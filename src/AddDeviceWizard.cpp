@@ -140,6 +140,7 @@ AddType::clicked(QString p)
         case DEV_ANTLOCAL : next = 50; break; // pair 
         default:
         case DEV_KICKR :
+        case DEV_BUDGET :
         case DEV_CT : next = 60; break; // confirm and add 
         case DEV_FORTIUS : next = 30; break; // confirm and add 
         }
@@ -205,6 +206,7 @@ DeviceScanner::quickScan(bool deep) // scan quickly or if true scan forever, as 
     case DEV_FORTIUS : wizard->controller = new FortiusController(NULL, NULL); break;
 #endif
     case DEV_NULL : wizard->controller = new NullController(NULL, NULL); break;
+    case DEV_BUDGET : wizard->controller = new BudgetTrainerController(NULL, NULL); break;
     case DEV_ANTLOCAL : wizard->controller = new ANTlocalController(NULL, NULL); break;
 #ifdef GC_HAVE_WFAPI
     case DEV_KICKR : wizard->controller = new KickrController(NULL, NULL); break;

@@ -271,6 +271,8 @@ HEADERS += \
         Bin2RideFile.h \
         BingMap.h \
         BlankState.h \
+        BudgetTrainer.h \
+        BudgetTrainerController.h \
         CalendarDownload.h \
         ChartSettings.h \
         ChooseCyclistDialog.h \
@@ -459,6 +461,8 @@ SOURCES += \
         Bin2RideFile.cpp \
         BingMap.cpp \
         BlankState.cpp \
+        BudgetTrainer.cpp \
+        BudgetTrainerController.cpp \
         CalendarDownload.cpp \
         ChartSettings.cpp \
         ChooseCyclistDialog.cpp \

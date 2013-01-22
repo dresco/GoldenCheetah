@@ -32,6 +32,7 @@
 // Three current realtime device types supported are:
 #include "RealtimeController.h"
 #include "ComputrainerController.h"
+#include "BudgetTrainerController.h"
 #include "ANTlocalController.h"
 #include "NullController.h"
 #ifdef GC_HAVE_WFAPI
@@ -516,6 +517,8 @@ TrainSidebar::configChanged()
 #endif
         } else if (Devices.at(i).type == DEV_NULL) {
             Devices[i].controller = new NullController(this, &Devices[i]);
+        } else if (Devices.at(i).type == DEV_BUDGET) {
+            Devices[i].controller = new BudgetTrainerController(this, &Devices[i]);
         } else if (Devices.at(i).type == DEV_ANTLOCAL) {
             Devices[i].controller = new ANTlocalController(this, &Devices[i]);
 #ifdef GC_HAVE_WFAPI

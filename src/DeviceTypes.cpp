@@ -56,6 +56,10 @@ DeviceTypes::DeviceTypes()
         tr("Racermate Computrainer Lab or Pro bike trainer with the handlebar controller "
         "connected via a USB adaptor or directly connected to a local serial port.") ,
         ":images/devices/computrainer.png"                                        },
+      { DEV_BUDGET,   DEV_SERIAL,  (char *) "Homebrew Budget Trainer",true,    false,
+        "Hoembrew Budget Trainer interface for mag turbo control "
+        "connected via a USB adaptor or directly connected to a local serial port." ,
+        ":images/devices/computrainer.png"                                        },   // FIXME: add a real icon
 #ifdef GC_HAVE_LIBUSB
       { DEV_FORTIUS,  DEV_LIBUSB,  (char *) "Tacx Fortius",          true,    false,
         tr("Tacx Fortius/iMagic bike trainer with the handlebar controller connected "
