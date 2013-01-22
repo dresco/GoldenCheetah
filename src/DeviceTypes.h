@@ -35,7 +35,7 @@
 #define DEV_GCLIENT    0x0200   // NOT IMPLEMENTED IN THIS RELEASE XXX
 #define DEV_FORTIUS    0x0800   // Tacx Fortius
 #define DEV_KICKR      0x1000   // Wahoo Kickr
-#define DEV_BUDGET     0x1200   // Homebrew Budget Trainer
+#define DEV_BUDGET     0x1200   // Homebrew BudgetTrainer
 #define DEV_BT40       0x2000   // Wahoo Kickr
 
 #define DEV_QUARQ      0x01     // ants use id:hostname:port

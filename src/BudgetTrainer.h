@@ -29,6 +29,33 @@
 #include "RealtimeController.h"
 #include "DeviceConfiguration.h"
 
+#ifdef WIN32
+#include <windows.h>
+#include <winbase.h>
+#else
+#include <termios.h> // unix!!
+#include <unistd.h> // unix!!
+#include <sys/ioctl.h>
+#ifndef N_TTY // for OpenBSD, this is a hack XXX
+#define N_TTY 0
+#endif
+#endif
+
+
+#include <stdio.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdlib.h>
+#include <errno.h>
+#include <fcntl.h>
+#include <sys/types.h>
+
+
+/* read timeouts in microseconds */
+#define BT_READTIMEOUT    1000
+#define BT_WRITETIMEOUT   2000
+
+
 class BudgetTrainer : public QThread
 {
 
@@ -44,19 +71,17 @@ public:
     int pause();                                // pauses data collection, inbound telemetry is discarded
     int stop();                                 // stops data collection thread
     int quit(int error);                        // called by thread before exiting
-    bool discover(QString deviceFilename);      // confirm CT is attached to device
+    bool discover(QString deviceFilename);      // confirm BT is attached to device
 
     // SET
     void setDevice(QString deviceFilename);     // setup the device filename
     void setLoad(double load);                  // set the load to generate in ERGOMODE
     void setGradient(double gradient);          // set the load to generate in SSMODE
     void setMode(int mode,
-        double load=100,                        // set mode to CT_ERGOMODE or CT_SSMODE
+        double load=100,                        // set mode to BT_ERGOMODE or BT_SSMODE
         double gradient=1);
 
     bool find();
-    int connect();
-    int disconnect();
 
     int getMode();
     double getGradient();
@@ -64,7 +89,7 @@ public:
     void getRealtimeData(RealtimeData &rtData);
 
 private:
-    void run();                                 // called by start to kick off the CT comtrol thread
+    void run();                                 // called by start to kick off the BT control thread
 
     // device configuration
     DeviceConfiguration *devConf;
@@ -76,6 +101,22 @@ private:
     volatile int mode;
     volatile double load;
     volatile double gradient;
+
+    // Utility and BG Thread functions
+    int openPort();
+    int closePort();
+
+    // device port
+    QString deviceFilename;
+#ifdef WIN32
+    HANDLE devicePort;              // file descriptor for reading from com3
+    DCB deviceSettings;             // serial port settings baud rate et al
+#else
+    int devicePort;                 // unix!!
+    struct termios deviceSettings;  // unix!!
+#endif
+    int rawWrite(uint8_t *bytes, int size); // unix!!
+    int rawRead(uint8_t *bytes, int size); // unix!!
 
 };
 
