@@ -31,6 +31,7 @@
 // Three current realtime device types supported are:
 #include "RealtimeController.h"
 #include "ComputrainerController.h"
+#include "BudgetTrainerController.h"
 #include "ANTplusController.h"
 #include "ANTlocalController.h"
 #include "NullController.h"
@@ -452,6 +453,8 @@ TrainTool::configChanged()
                 Devices[i].controller = new ANTplusController(this, &Devices[i]);
             } else if (Devices.at(i).type == DEV_CT) {
                 Devices[i].controller = new ComputrainerController(this, &Devices[i]);
+            } else if (Devices.at(i).type == DEV_BUDGET) {
+                Devices[i].controller = new BudgetTrainerController(this, &Devices[i]);
 #ifdef GC_HAVE_LIBUSB
             } else if (Devices.at(i).type == DEV_FORTIUS) {
                 Devices[i].controller = new FortiusController(this, &Devices[i]);
