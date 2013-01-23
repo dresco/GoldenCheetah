@@ -55,12 +55,14 @@
 #define BT_READTIMEOUT    1000
 #define BT_WRITETIMEOUT   2000
 
+#define BT_GRADIENT  1.50
+
 
 class BudgetTrainer : public QThread
 {
 
 public:
-    BudgetTrainer(QObject *parent=0, DeviceConfiguration * devConf=0);       // pass device
+    BudgetTrainer(QObject *parent=0, QString deviceFilename=0);       // pass device
     ~BudgetTrainer();
 
     QObject *parent;
@@ -105,6 +107,15 @@ private:
     // Utility and BG Thread functions
     int openPort();
     int closePort();
+
+    // Protocol encoding
+    int sendCommand();      // writes a command to the device
+
+    // Protocol decoding
+    int readMessage();
+
+    // i/o message holder
+    uint8_t buf[16];
 
     // device port
     QString deviceFilename;

@@ -24,7 +24,7 @@
 
 BudgetTrainerController::BudgetTrainerController(TrainTool *parent, DeviceConfiguration *dc) : RealtimeController(parent, dc)
 {
-    myBudgetTrainer = new BudgetTrainer(parent, dc);
+    myBudgetTrainer = new BudgetTrainer(parent, dc ? dc->portSpec : ""); // we may get NULL passed when configuring
 }
 
 void
@@ -74,6 +74,19 @@ BudgetTrainerController::discover(QString name)
 }
 
 
+void
+BudgetTrainerController::setLoad(double load)
+{
+    myBudgetTrainer->setLoad(load);
+}
+
+void
+BudgetTrainerController::setGradient(double grade)
+{
+    myBudgetTrainer->setGradient(grade);
+}
+
+
 bool BudgetTrainerController::doesPush() { return false; }
 bool BudgetTrainerController::doesPull() { return true; }
 bool BudgetTrainerController::doesLoad() { return true; }
@@ -98,6 +111,12 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
     }
     // get latest telemetry
     myBudgetTrainer->getRealtimeData(rtData);
+    // FIXME: bodge in some movement...
+    rtData.setSpeed(20);
+    rtData.setWatts(200);
+    rtData.setCadence(100);
+    rtData.setHr(140);
+
     processRealtimeData(rtData);
 }
 
