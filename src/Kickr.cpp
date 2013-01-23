@@ -100,7 +100,9 @@ double Kickr::getGradient()
 void
 Kickr::getRealtimeData(RealtimeData &rtData)
 {
+    pvars.lock();
     rtData = rt;
+    pvars.unlock();
 }
 
 int
@@ -148,7 +150,16 @@ void Kickr::run()
 
         msleep(100);
 
-        if (WFApi::getInstance()->hasData()) WFApi::getInstance()->getRealtimeData(&rt);
+        if (WFApi::getInstance()->hasData()) {
+            pvars.lock();
+            WFApi::getInstance()->getRealtimeData(&rt);
+
+            // set speed from wheelRpm and configured wheelsize
+            double x = rt.getWheelRpm();
+            if (devConf) rt.setSpeed(x * (devConf->wheelSize/1000) * 60 / 1000);
+            else rt.setSpeed(x * 2.10 * 60 / 1000);
+            pvars.unlock();
+        }
     }
 
     disconnectKickr();
