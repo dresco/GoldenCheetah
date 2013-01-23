@@ -49,7 +49,9 @@ public:
     bool doesPush(), doesPull(), doesLoad();
     void getRealtimeData(RealtimeData &rtData);
     void pushRealtimeData(RealtimeData &rtData);
-    void setLoad(double) { return; }
+    void setLoad(double);
+    void setGradient(double);
+
 
 signals:
 

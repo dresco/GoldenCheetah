@@ -22,10 +22,12 @@
 /* ----------------------------------------------------------------------
  * CONSTRUCTOR/DESTRUCTOR
  * ---------------------------------------------------------------------- */
-BudgetTrainer::BudgetTrainer(QObject *parent,  DeviceConfiguration *devConf) : QThread(parent)
+BudgetTrainer::BudgetTrainer(QObject *parent,  QString devname) : QThread(parent)
 {
     this->parent = parent;
-    this->devConf = devConf;
+    setDevice(devname);
+    gradient = BT_GRADIENT;
+
 }
 
 BudgetTrainer::~BudgetTrainer()
@@ -35,9 +37,10 @@ BudgetTrainer::~BudgetTrainer()
 /* ----------------------------------------------------------------------
  * SET
  * ---------------------------------------------------------------------- */
-void BudgetTrainer::setDevice(QString)
+void BudgetTrainer::setDevice(QString devname)
 {
-    // not required
+    // if not null, replace existing if set, otherwise set
+    deviceFilename = devname;
 }
 
 void BudgetTrainer::setMode(int mode, double load, double gradient)
@@ -142,12 +145,22 @@ void BudgetTrainer::run()
         return; // open failed!
     } else {
         isDeviceOpen = true;
+        running = true;
     }
 
-    while(1) {
+    while(running == true) {
         if (isDeviceOpen == true) {
-	}
-        msleep(10);
+            if (sendCommand() == -1) {
+                // send failed - ouch!
+                closePort(); // need to release that file handle!!
+                isDeviceOpen = false;
+                quit(4);
+                return; // couldn't write to the device
+	        }
+        qDebug() << "Running " << running;
+        qDebug() << "Gradient " << gradient;
+        msleep(1000);
+        }
     }
 
     closePort(); // need to release that file handle!!
@@ -365,3 +378,13 @@ int BudgetTrainer::rawRead(uint8_t bytes[], int size)
 }
 
 
+int BudgetTrainer::sendCommand()
+{
+	uint8_t *test = (uint8_t *)"BudgetTrainer";
+	return rawWrite(test, 13);
+}
+
+int BudgetTrainer::readMessage()
+{
+    return rawRead(buf, 16);
+}
