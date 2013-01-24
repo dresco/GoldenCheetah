@@ -86,6 +86,15 @@ BudgetTrainerController::setGradient(double grade)
     myBudgetTrainer->setGradient(grade);
 }
 
+void
+BudgetTrainerController::setMode(int mode)
+{
+    if (mode == RT_MODE_ERGO) mode = BT_ERGOMODE;
+    if (mode == RT_MODE_SPIN) mode = BT_SSMODE;
+    if (mode == RT_MODE_CALIBRATE) mode = BT_CALIBRATE;
+    myBudgetTrainer->setMode(mode);
+}
+
 
 bool BudgetTrainerController::doesPush() { return false; }
 bool BudgetTrainerController::doesPull() { return true; }
@@ -111,12 +120,6 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
     }
     // get latest telemetry
     myBudgetTrainer->getRealtimeData(rtData);
-    // FIXME: bodge in some movement...
-    rtData.setSpeed(20);
-    rtData.setWatts(200);
-    rtData.setCadence(100);
-    rtData.setHr(140);
-
     processRealtimeData(rtData);
 }
 

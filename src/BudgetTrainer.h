@@ -50,12 +50,19 @@
 #include <fcntl.h>
 #include <sys/types.h>
 
+/* Device operation modes */
+#define BT_SSMODE      0x01
+#define BT_ERGOMODE    0x02
+#define BT_CALIBRATE   0x04
 
 /* read timeouts in microseconds */
 #define BT_READTIMEOUT    1000
 #define BT_WRITETIMEOUT   2000
 
-#define BT_GRADIENT  1.50
+//#define DEFAULT_LOAD        50.00
+//#define DEFAULT_GRADIENT    2.00
+#define BT_LOAD        50.00
+#define BT_GRADIENT    2.00
 
 
 class BudgetTrainer : public QThread
@@ -96,6 +103,12 @@ private:
     // device configuration
     DeviceConfiguration *devConf;
 
+    // 8 byte command messages
+    uint8_t ERGO_Command[8],
+            SLOPE_Command[8];
+
+
+
     // Mutex for controlling accessing private data
     QMutex pvars;
 
@@ -109,7 +122,8 @@ private:
     int closePort();
 
     // Protocol encoding
-    int sendCommand();      // writes a command to the device
+    void prepareCommand(int mode, double value);  // sets up the command packet according to current settings
+    int sendCommand(int mode);      // writes a command to the device
 
     // Protocol decoding
     int readMessage();

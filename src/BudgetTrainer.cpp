@@ -19,6 +19,28 @@
 
 #include "BudgetTrainer.h"
 
+//
+// Outbound control message has the format:
+// Byte          Value / Meaning
+// 0             0xAA CONSTANT
+// 1             0x01 CONSTANT
+// 2             Mode - 0x01 = slope, 0x02 = ergo, 0x4 = calibrate
+// 3             Target gradient (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+// 4             Target power - Lo Byte
+// 5             Target power - Hi Byte
+// 6             0x00 -- UNUSED
+// 7             0x00 -- UNUSED
+
+const static uint8_t slope_command[8] = {
+     // 0     1     2     3     4     5     6     7
+        0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
+const static uint8_t ergo_command[8] = {
+     // 0     1     2     3     4     5     6     7
+        0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00
+};
+
 /* ----------------------------------------------------------------------
  * CONSTRUCTOR/DESTRUCTOR
  * ---------------------------------------------------------------------- */
@@ -27,7 +49,11 @@ BudgetTrainer::BudgetTrainer(QObject *parent,  QString devname) : QThread(parent
     this->parent = parent;
     setDevice(devname);
     gradient = BT_GRADIENT;
+    load = BT_LOAD;
+    mode = BT_ERGOMODE;
 
+    memcpy(ERGO_Command, ergo_command, 8);
+    memcpy(SLOPE_Command, slope_command, 8);
 }
 
 BudgetTrainer::~BudgetTrainer()
@@ -103,7 +129,11 @@ double BudgetTrainer::getGradient()
 void
 BudgetTrainer::getRealtimeData(RealtimeData &rtData)
 {
-    rtData.setWatts(0); // XXX watts only...
+    // FIXME: bodge in some movement...
+    rtData.setSpeed(20);
+    rtData.setWatts(200);
+    rtData.setCadence(100);
+    rtData.setHr(140);
 }
 
 int
@@ -132,12 +162,67 @@ int BudgetTrainer::quit(int code)
     return 0; // never gets here obviously but shuts up the compiler!
 }
 
-/*----------------------------------------------------------------------
- * THREADED CODE - READS TELEMETRY AND SENDS COMMANDS TO KEEP CT ALIVE
- *----------------------------------------------------------------------*/
+void BudgetTrainer::prepareCommand(int mode, double value)
+{
+    // prepare the control message according to the current mode and gradient/load
+
+    int16_t encoded;
+
+    switch (mode) {
+
+        case BT_ERGOMODE :
+            encoded = 10 * value;
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[4]); // little endian
+            break;
+
+        case BT_SSMODE :
+            SLOPE_Command[3] = value + 10 * 10;
+            break;
+
+    }
+}
+
+
+/* ----------------------------------------------------------------------
+ * EXECUTIVE FUNCTIONS
+ *
+ * start() - start/re-start reading telemetry in a thread
+ * stop() - stop reading telemetry and terminates thread
+ * pause() - discards inbound telemetry (ignores it)
+ *
+ *
+ * THE MEAT OF THE CODE IS IN RUN() IT IS A WHILE LOOP CONSTANTLY
+ * READING TELEMETRY AND ISSUING CONTROL COMMANDS WHILST UPDATING
+ * MEMBER VARIABLES AS TELEMETRY CHANGES ARE FOUND.
+ *
+ * run() - bg thread continuosly reading/writing the device port
+ *         it is kicked off by start and then examines status to check
+ *         when it is time to pause or stop altogether.
+ * ---------------------------------------------------------------------- */
 void BudgetTrainer::run()
 {
+    // newly read values - compared against cached values
+    double newload, newgradient;
     bool isDeviceOpen = false;
+
+    // Cached current values
+    // when new values are received from the device
+    // if they differ from current values we update
+    // otherwise do nothing
+    int curmode; //, curstatus;
+    double curload, curgradient;
+//    double curPower;                      // current output power in Watts
+//    double curHeartRate;                  // current heartrate in BPM
+//    double curCadence;                    // current cadence in RPM
+//    double curSpeed;                      // current speef in KPH
+//    int curButtons;                       // Button status
+
+    // initialise local cache & main vars
+    pvars.lock();
+    curmode = this->mode;
+    curload = this->load;
+    curgradient = this->gradient;
+    pvars.unlock();
 
     // open the device
     if (openPort()) {
@@ -148,17 +233,46 @@ void BudgetTrainer::run()
         running = true;
     }
 
+    // send first command
+    prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient);
+    if (sendCommand(curmode) == -1) {
+
+        // send failed - ouch!
+        closePort(); // need to release that file handle!!
+        isDeviceOpen = false;
+        quit(4);
+        return; // couldn't write to the device
+    }
+
     while(running == true) {
+
+    	// get some telemetry back...
+    	//if (readMessage() > 0) {
+        //
+    	//}
+
+        //----------------------------------------------------------------
+        // LISTEN TO GUI CONTROL COMMANDS
+        //----------------------------------------------------------------
+        pvars.lock();
+        mode = curmode = this->mode; // XXX
+        load = curload = newload = this->load;
+        gradient = curgradient = newgradient = this->gradient;
+        pvars.unlock();
+
+    	// write gradient / power values to trainer
         if (isDeviceOpen == true) {
-            if (sendCommand() == -1) {
+            prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient);
+            if (sendCommand(curmode) == -1) {
                 // send failed - ouch!
                 closePort(); // need to release that file handle!!
                 isDeviceOpen = false;
                 quit(4);
                 return; // couldn't write to the device
 	        }
-        qDebug() << "Running " << running;
         qDebug() << "Gradient " << gradient;
+        qDebug() << "Load " << load;
+        qDebug() << "Mode " << mode;
         msleep(1000);
         }
     }
@@ -182,7 +296,6 @@ bool BudgetTrainer::discover(QString)
 {
     return false;
 }
-
 
 int BudgetTrainer::closePort()
 {
@@ -307,8 +420,6 @@ int BudgetTrainer::openPort()
     return 0;
 }
 
-
-
 int BudgetTrainer::rawWrite(uint8_t *bytes, int size) // unix!!
 {
     int rc=0,ibytes;
@@ -377,14 +488,26 @@ int BudgetTrainer::rawRead(uint8_t bytes[], int size)
 #endif
 }
 
-
-int BudgetTrainer::sendCommand()
+int BudgetTrainer::sendCommand(int mode)
 {
-	uint8_t *test = (uint8_t *)"BudgetTrainer";
-	return rawWrite(test, 13);
+    switch (mode) {
+
+        case BT_ERGOMODE :
+            return rawWrite(ERGO_Command, 8);
+            break;
+
+        case BT_SSMODE :
+            return rawWrite(SLOPE_Command, 8);
+            break;
+
+        default :
+            return -1;
+            break;
+    }
+	return 0; // never gets here
 }
 
 int BudgetTrainer::readMessage()
 {
-    return rawRead(buf, 16);
+    return rawRead(buf, 8);
 }
