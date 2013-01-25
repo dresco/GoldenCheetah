@@ -54,12 +54,18 @@
 #define BT_SSMODE         0x02
 #define BT_CALIBRATE      0x04
 
+/* Buttons */
+#define BT_PLUS           0x04
+#define BT_MINUS          0x02
+#define BT_CANCEL         0x08
+#define BT_ENTER          0x01
+
 /* read timeouts in microseconds */
 #define BT_READTIMEOUT    1000
 #define BT_WRITETIMEOUT   2000
 
 #define BT_LOAD           50.00
-#define BT_GRADIENT       2.00
+#define BT_GRADIENT       0.00
 
 #define BT_MESSAGE_SIZE   8
 
@@ -93,6 +99,7 @@ public:
     int getMode();
     double getGradient();
     double getLoad();
+    uint8_t getButtons();
     void getRealtimeData(RealtimeData &rtData);
 
 private:
@@ -110,6 +117,9 @@ private:
 
     // Mutex for controlling accessing private data
     QMutex pvars;
+
+    // inbound telemetry
+    volatile uint8_t deviceButtons;
 
     bool running, connected;
     volatile int mode;

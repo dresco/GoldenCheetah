@@ -28,7 +28,7 @@
 // 3             Target gradient (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
 // 4             Target power - Lo Byte
 // 5             Target power - Hi Byte
-// 6             0x00 -- UNUSED
+// 6             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
 // 7             0x00 -- UNUSED
 
 const static uint8_t slope_command[BT_MESSAGE_SIZE] = {
@@ -108,6 +108,15 @@ int BudgetTrainer::getMode()
     return tmp;
 }
 
+uint8_t BudgetTrainer::getButtons()
+{
+    int  tmp;
+    pvars.lock();
+    tmp = this->deviceButtons;
+    pvars.unlock();
+    return tmp;
+}
+
 double BudgetTrainer::getLoad()
 {
     double tmp;
@@ -176,7 +185,7 @@ void BudgetTrainer::prepareCommand(int mode, double value)
             break;
 
         case BT_SSMODE :
-            SLOPE_Command[3] = value + 10 * 10;
+            SLOPE_Command[3] = (value + 10) * 10;
             break;
 
     }
@@ -211,11 +220,13 @@ void BudgetTrainer::run()
     // otherwise do nothing
     int curmode; //, curstatus;
     double curload, curgradient;
+    int buttons;
+
 //    double curPower;                      // current output power in Watts
 //    double curHeartRate;                  // current heartrate in BPM
 //    double curCadence;                    // current cadence in RPM
 //    double curSpeed;                      // current speef in KPH
-//    int curButtons;                       // Button status
+    int curButtons;                       // Button status
 
     // initialise local cache & main vars
     pvars.lock();
@@ -247,9 +258,12 @@ void BudgetTrainer::run()
     while(running == true) {
 
     	// get some telemetry back...
-    	//if (readMessage() > 0) {
-        //
-    	//}
+    	if (readMessage() > 0) {
+            pvars.lock();
+            this->deviceButtons = curButtons = buttons = buf[6];
+            pvars.unlock();
+
+    	}
 
         //----------------------------------------------------------------
         // LISTEN TO GUI CONTROL COMMANDS
@@ -273,7 +287,9 @@ void BudgetTrainer::run()
         qDebug() << "Gradient " << gradient;
         qDebug() << "Load " << load;
         qDebug() << "Mode " << mode;
-        msleep(1000);
+        qDebug() << "Buttons " << buttons;
+
+        msleep(500);
         }
     }
 

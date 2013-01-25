@@ -109,6 +109,9 @@ bool BudgetTrainerController::doesLoad() { return true; }
 void
 BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
 {
+	uint8_t Buttons;
+	double Load;
+
     if(!myBudgetTrainer->isRunning())
     {
         QMessageBox msgBox;
@@ -119,8 +122,28 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
         return;
     }
     // get latest telemetry
+    Buttons = myBudgetTrainer->getButtons();
     myBudgetTrainer->getRealtimeData(rtData);
     processRealtimeData(rtData);
+
+    //
+    // BUTTONS
+    //
+
+    // ignore other buttons if calibrating
+//  if (parent->calibrating) return;
+
+    // ADJUST LOAD
+    Load = myBudgetTrainer->getLoad();
+    if ((Buttons&BT_PLUS)) parent->Higher();
+    if ((Buttons&BT_MINUS)) parent->Lower();
+    rtData.setLoad(Load);
+
+    // LAP/INTERVAL
+    if (Buttons&BT_ENTER) parent->newLap();
+
+    // CANCEL
+    if (Buttons&BT_CANCEL) parent->Stop(0);
 }
 
 void BudgetTrainerController::pushRealtimeData(RealtimeData &) { } // update realtime data with current values
