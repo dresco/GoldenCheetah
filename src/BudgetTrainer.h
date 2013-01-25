@@ -41,7 +41,6 @@
 #endif
 #endif
 
-
 #include <stdio.h>
 #include <stdint.h>
 #include <stddef.h>
@@ -51,19 +50,18 @@
 #include <sys/types.h>
 
 /* Device operation modes */
-#define BT_SSMODE      0x01
-#define BT_ERGOMODE    0x02
-#define BT_CALIBRATE   0x04
+#define BT_ERGOMODE       0x01
+#define BT_SSMODE         0x02
+#define BT_CALIBRATE      0x04
 
 /* read timeouts in microseconds */
 #define BT_READTIMEOUT    1000
 #define BT_WRITETIMEOUT   2000
 
-//#define DEFAULT_LOAD        50.00
-//#define DEFAULT_GRADIENT    2.00
-#define BT_LOAD        50.00
-#define BT_GRADIENT    2.00
+#define BT_LOAD           50.00
+#define BT_GRADIENT       2.00
 
+#define BT_MESSAGE_SIZE   8
 
 class BudgetTrainer : public QThread
 {
@@ -81,6 +79,7 @@ public:
     int stop();                                 // stops data collection thread
     int quit(int error);                        // called by thread before exiting
     bool discover(QString deviceFilename);      // confirm BT is attached to device
+    bool find();
 
     // SET
     void setDevice(QString deviceFilename);     // setup the device filename
@@ -90,8 +89,7 @@ public:
         double load=100,                        // set mode to BT_ERGOMODE or BT_SSMODE
         double gradient=1);
 
-    bool find();
-
+    // GET
     int getMode();
     double getGradient();
     double getLoad();
@@ -103,11 +101,12 @@ private:
     // device configuration
     DeviceConfiguration *devConf;
 
+    // i/o message holder
+    uint8_t buf[BT_MESSAGE_SIZE];
+
     // 8 byte command messages
-    uint8_t ERGO_Command[8],
-            SLOPE_Command[8];
-
-
+    uint8_t ERGO_Command[BT_MESSAGE_SIZE],
+            SLOPE_Command[BT_MESSAGE_SIZE];
 
     // Mutex for controlling accessing private data
     QMutex pvars;
@@ -127,9 +126,6 @@ private:
 
     // Protocol decoding
     int readMessage();
-
-    // i/o message holder
-    uint8_t buf[16];
 
     // device port
     QString deviceFilename;

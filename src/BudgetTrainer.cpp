@@ -24,19 +24,19 @@
 // Byte          Value / Meaning
 // 0             0xAA CONSTANT
 // 1             0x01 CONSTANT
-// 2             Mode - 0x01 = slope, 0x02 = ergo, 0x4 = calibrate
+// 2             Mode - 0x01 = ergo, 0x02 = slope, 0x4 = calibrate
 // 3             Target gradient (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
 // 4             Target power - Lo Byte
 // 5             Target power - Hi Byte
 // 6             0x00 -- UNUSED
 // 7             0x00 -- UNUSED
 
-const static uint8_t slope_command[8] = {
+const static uint8_t slope_command[BT_MESSAGE_SIZE] = {
      // 0     1     2     3     4     5     6     7
         0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-const static uint8_t ergo_command[8] = {
+const static uint8_t ergo_command[BT_MESSAGE_SIZE] = {
      // 0     1     2     3     4     5     6     7
         0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00
 };
@@ -52,8 +52,8 @@ BudgetTrainer::BudgetTrainer(QObject *parent,  QString devname) : QThread(parent
     load = BT_LOAD;
     mode = BT_ERGOMODE;
 
-    memcpy(ERGO_Command, ergo_command, 8);
-    memcpy(SLOPE_Command, slope_command, 8);
+    memcpy(ERGO_Command, ergo_command, BT_MESSAGE_SIZE);
+    memcpy(SLOPE_Command, slope_command, BT_MESSAGE_SIZE);
 }
 
 BudgetTrainer::~BudgetTrainer()
@@ -493,11 +493,11 @@ int BudgetTrainer::sendCommand(int mode)
     switch (mode) {
 
         case BT_ERGOMODE :
-            return rawWrite(ERGO_Command, 8);
+            return rawWrite(ERGO_Command, BT_MESSAGE_SIZE);
             break;
 
         case BT_SSMODE :
-            return rawWrite(SLOPE_Command, 8);
+            return rawWrite(SLOPE_Command, BT_MESSAGE_SIZE);
             break;
 
         default :
@@ -509,5 +509,5 @@ int BudgetTrainer::sendCommand(int mode)
 
 int BudgetTrainer::readMessage()
 {
-    return rawRead(buf, 8);
+    return rawRead(buf, BT_MESSAGE_SIZE);
 }
