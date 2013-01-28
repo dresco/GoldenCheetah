@@ -110,7 +110,7 @@ void
 BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
 {
 	uint8_t Buttons;
-	double Load;
+	double Load, Gradient;
 
     if(!myBudgetTrainer->isRunning())
     {
@@ -133,11 +133,14 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
     // ignore other buttons if calibrating
 //  if (parent->calibrating) return;
 
-    // ADJUST LOAD
+    // ADJUST LOAD & GRADIENT
+    // the calls to the parent will determine which mode we are on (ERG/SPIN) and adjust load/slope appropriately
     Load = myBudgetTrainer->getLoad();
+    Gradient = myBudgetTrainer->getGradient();
     if ((Buttons&BT_PLUS)) parent->Higher();
     if ((Buttons&BT_MINUS)) parent->Lower();
     rtData.setLoad(Load);
+    rtData.setSlope(Gradient);
 
     // LAP/INTERVAL
     if (Buttons&BT_ENTER) parent->newLap();
