@@ -18,9 +18,6 @@
 
 #include "Kickr.h"
 
-/* ----------------------------------------------------------------------
- * CONSTRUCTOR/DESRTUCTOR
- * ---------------------------------------------------------------------- */
 Kickr::Kickr(QObject *parent,  DeviceConfiguration *devConf) : QThread(parent)
 {
     this->parent = parent;
@@ -35,13 +32,8 @@ Kickr::~Kickr()
 {
 }
 
-/* ----------------------------------------------------------------------
- * SET
- * ---------------------------------------------------------------------- */
-void Kickr::setDevice(QString)
-{
-    // not required
-}
+// not required
+void Kickr::setDevice(QString) { }
 
 void Kickr::setMode(int mode, double load, double gradient)
 {
@@ -68,10 +60,6 @@ void Kickr::setGradient(double gradient)
     pvars.unlock();
 }
 
-
-/* ----------------------------------------------------------------------
- * GET
- * ---------------------------------------------------------------------- */
 
 int Kickr::getMode()
 {
@@ -135,7 +123,7 @@ int Kickr::quit(int code)
 }
 
 /*----------------------------------------------------------------------
- * THREADED CODE - READS TELEMETRY AND SENDS COMMANDS TO KEEP CT ALIVE
+ * MAIN THREAD - READS TELEMETRY AND UPDATES LOAD/GRADIENT ON KICKR
  *----------------------------------------------------------------------*/
 void Kickr::run()
 {
@@ -152,38 +140,35 @@ void Kickr::run()
     running = true;
     while(running) {
 
-        // make sure we are the right mode
-        if (currentmode != mode) {
+        // only get busy if we're actually connected
+        if (WFApi::getInstance()->isConnected()) {
 
-            switch (mode) {
+            // We ALWAYS set load for each loop. This is because
+            // even though the device reports as connected we need
+            // to wait before it really is. So we just keep on
+            // sending the current mode/load. It doesn't cost us
+            // anything since all devices are powered.
 
-            default:
-            case RT_MODE_ERGO :
-                currentmode = RT_MODE_ERGO;
+            // it does generate a few error messages though..
+            // and the connection takes about 25 secs to get
+            // up to speed.
+
+            // set load - reset it if generated watts don't match .. 
+            if (mode == RT_MODE_ERGO) {
                 WFApi::getInstance()->setErgoMode();
-                break;
+                WFApi::getInstance()->setLoad(load);
+                currentload = load;
+                currentmode = mode;
+            }
 
-            case RT_MODE_SLOPE :
-                currentmode = RT_MODE_SLOPE;
+            // set slope
+            if (mode == RT_MODE_SLOPE && currentslope) {
                 WFApi::getInstance()->setSlopeMode();
-                break;
-
+                WFApi::getInstance()->setSlope(slope);
+                currentslope = slope;
+                currentmode = mode;
             }
         }
-
-        // set load
-        if (mode == RT_MODE_ERGO && currentload != load) {
-            WFApi::getInstance()->setLoad(load);
-            currentload = load;
-        }
-
-        // set slope
-        if (mode == RT_MODE_SLOPE && currentslope != slope) {
-            WFApi::getInstance()->setSlope(slope);
-            currentslope = slope;
-        }
-
-        msleep(100);
 
         if (WFApi::getInstance()->hasData()) {
             pvars.lock();
@@ -195,6 +180,9 @@ void Kickr::run()
             else rt.setSpeed(x * 2.10 * 60 / 1000);
             pvars.unlock();
         }
+
+        // lets not hog cpu
+        msleep(100);
     }
 
     disconnectKickr();
@@ -223,8 +211,14 @@ Kickr::find()
 int
 Kickr::connectKickr()
 {
+    // get a pool for this thread
+    pool = WFApi::getInstance()->getPool();
+
     // do we even have BTLE hardware?
-    if (WFApi::getInstance()->isBTLEEnabled() == false) return (-1);
+    if (WFApi::getInstance()->isBTLEEnabled() == false) {
+        WFApi::getInstance()->freePool(pool);
+        return (-1);
+    }
 
     // discover first...
     if (scanned == false) find();
@@ -239,7 +233,10 @@ Kickr::connectKickr()
             break;
         }
     }
-    if (found == false) return -1;
+    if (found == false) {
+        WFApi::getInstance()->freePool(pool);
+        return (-1);
+    }
 
     w->connectDevice(i);
     return 0;
@@ -251,6 +248,10 @@ Kickr::disconnectKickr()
     // disconnect
     WFApi::getInstance()->disconnectDevice();
     connected = false;
+
+    // clear that pool now we're done
+    WFApi::getInstance()->freePool(pool);
+
     return 0;
 }
 

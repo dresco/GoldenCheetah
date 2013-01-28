@@ -25,23 +25,15 @@
 #import <AppKit/NSSegmentedControl.h>
 #import <AppKit/NSBezierPath.h>
 
-/*----------------------------------------------------------------------
- * Utility functions
- *----------------------------------------------------------------------*/
-class CocoaInitializer::Private
-{
-    public:
-};
-
 CocoaInitializer::CocoaInitializer()
 {
-    d = new CocoaInitializer::Private();
+    pool = [[NSAutoreleasePool alloc] init];
     NSApplicationLoad();
 }
 
 CocoaInitializer::~CocoaInitializer()
 {
-    delete d;
+    [pool release];
 }
 
 
@@ -50,10 +42,11 @@ inline NSString *darwinQStringToNSString (const QString &aString)
     return [(CFStringCreateWithCharacters (0, reinterpret_cast<const UniChar *> (aString.unicode()), aString.length())) autorelease];
 }
 
-static NSImage* fromQPixmap(const QPixmap &pixmap)
+static NSImage *fromQPixmap(const QPixmap &pixmap)
 {
-    CGImageRef cgImage = pixmap.toMacCGImageRef();
-    NSImage *image =[[NSImage alloc] initWithCGImage:cgImage size:NSZeroSize];
+    NSBitmapImageRep *bitmapRep = [[NSBitmapImageRep alloc] initWithCGImage:pixmap.toMacCGImageRef()];
+    NSImage *image = [[NSImage alloc] init];
+    [image addRepresentation:bitmapRep];
     [image setTemplate:true];
     return image;
 }

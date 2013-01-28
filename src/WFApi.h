@@ -62,7 +62,24 @@ public:
     bool isCommunicationHWReady();
 
     // current state
+    typedef enum {
+        WFAPI_HWCONN_STATE_NOT_CONNECTED                = 0,
+        WFAPI_HWCONN_STATE_CONNECTED                    = 0x01,
+        WFAPI_HWCONN_STATE_ACTIVE                       = 0x02,
+        WFAPI_HWCONN_STATE_RESET                        = 0x04,
+        WFAPI_HWCONN_STATE_BT40_ENABLED                 = 0x08,
+        WFAPI_HWCONN_STATE_BT_BONDING_MODE              = 0x10 };
     int currentState();
+
+    // connection state
+    typedef enum {
+    WF_SENSOR_CONNECTION_STATUS_IDLE = 0,
+    WF_SENSOR_CONNECTION_STATUS_CONNECTING = 1,
+    WF_SENSOR_CONNECTION_STATUS_CONNECTED = 2,
+    WF_SENSOR_CONNECTION_STATUS_INTERRUPTED = 3,
+    WF_SENSOR_CONNECTION_STATUS_DISCONNECTING = 4 };
+    int connectionStatus();
+    bool isConnected();
 
     // scan
     bool discoverDevicesOfType(int eSensorType, int eNetworkType, int timeout);
@@ -85,8 +102,18 @@ public:
     void setSlope(double slope);
     void setLoad(int watts);
 
+    // NOTE: There is an application wide NSAutoreleasePool maintained
+    //       in cocoa initialiser, but it is only to support activity on
+    //       the main thread.
+    //       The application code (e.g. Kickr.cpp) needs to get and free a
+    //       pool for each thread, this is why we have a getPool/freePool
+    //       method in WFApi, but never allocate a pool ourselves.
+    void *getPool();
+    void freePool(void*);
+
 signals:
     void currentStateChanged(int); // hardware conncector state changed
+    void connectionStateChanged(int status);
     int discoveredDevices(int,bool);
     void connectionHasData();
 
@@ -124,22 +151,5 @@ public:
 // assume you are building with OBJ C. And fail to compile with gcc/g++
 //
 
-// Hardware Connector states
-typedef enum
-{
-    /** The fisica device is not physically connected to the iPod. */
-    WFAPI_HWCONN_STATE_NOT_CONNECTED                = 0,
-    /** The fisica device is physically connected to the iPod. */
-    WFAPI_HWCONN_STATE_CONNECTED                    = 0x01,
-    /** The fisica device is connected and communication is established (norml operating mode). */
-    WFAPI_HWCONN_STATE_ACTIVE                       = 0x02,
-    /** The fisica device is performing a reset operation. */
-    WFAPI_HWCONN_STATE_RESET                        = 0x04,
-    /** The BTLE hardware is enabled. */
-    WFAPI_HWCONN_STATE_BT40_ENABLED                 = 0x08,
-    /** The BTLE controller is in bonding mode. */
-    WFAPI_HWCONN_STATE_BT_BONDING_MODE              = 0x10,
-    
-} WFConnState;
 
 #endif

@@ -135,6 +135,11 @@ MainWindow::MainWindow(const QDir &home) :
     zones_(new Zones), hrzones_(new HrZones),
     ride(NULL), workout(NULL)
 {
+    #ifdef Q_OS_MAC
+    // get an autorelease pool setup
+    static CocoaInitializer cocoaInitializer;
+    #endif
+
     #ifdef GC_HAVE_WFAPI
     WFApi *w = WFApi::getInstance(); // ensure created on main thread
     w->apiVersion();//shutup compiler
@@ -204,7 +209,6 @@ MainWindow::MainWindow(const QDir &home) :
 
 
 #ifdef Q_OS_MAC // MAC NATIVE TOOLBAR
-    static CocoaInitializer cocoaInitializer; // we only need one
     setUnifiedTitleAndToolBarOnMac(true);
     head = addToolBar(cyclist);
     head->setContentsMargins(0,0,0,0);
@@ -220,13 +224,15 @@ MainWindow::MainWindow(const QDir &home) :
     QHBoxLayout *lb = new QHBoxLayout(macAnalButtons);
     lb->setContentsMargins(0,0,0,0);
     lb->setSpacing(0);
-    QtMacButton *import = new QtMacButton(this, QtMacButton::TexturedRounded);
-    import->setImage(QPixmap(":images/mac/download.png"));
+    import = new QtMacButton(this, QtMacButton::TexturedRounded);
+    QPixmap importImg(":images/mac/download.png");
+    import->setImage(importImg);
     import->setToolTip("Download");
     lb->addWidget(import);
     lb->addWidget(new Spacer(this));
-    QtMacButton *compose = new QtMacButton(this, QtMacButton::TexturedRounded);
-    compose->setImage(QPixmap(":images/mac/compose.png"));
+    compose = new QtMacButton(this, QtMacButton::TexturedRounded);
+    QPixmap composeImg(":images/mac/compose.png");
+    compose->setImage(composeImg);
     compose->setToolTip("Create");
     lb->addWidget(compose);
 
@@ -1388,6 +1394,9 @@ MainWindow::closeEvent(QCloseEvent* event)
     if (saveRideExitDialog() == false) event->ignore();
     else {
 
+        // stop any active realtime conneection
+        trainTool->Stop();
+
         // save ride list config
         appsettings->setCValue(cyclist, GC_SORTBY, listView->sortByIndex());
         appsettings->setCValue(cyclist, GC_SORTBYORDER, listView->sortByOrder());
@@ -1593,6 +1602,7 @@ MainWindow::selectAnalysis()
 #else
         scopebar->setEnabledHideButton(true);
 #endif
+		this->showSidebar(true);
         masterControls->setCurrentIndex(0);
         views->setCurrentIndex(0);
         analWindow->selected(); // tell it!
@@ -1608,9 +1618,9 @@ MainWindow::selectAnalysis()
         scopebar->selected(2);
 #endif
         toolBox->setCurrentIndex(0);
-        setStyle();
     }
     currentWindow = analWindow;
+    setStyle();
 }
 
 void
@@ -1630,7 +1640,12 @@ MainWindow::selectTrain()
     } else {
         masterControls->setVisible(true);
         toolBox->show();
+#ifndef Q_OS_MAC
         side->setEnabled(true);
+#else
+        scopebar->setEnabledHideButton(true);
+#endif
+		this->showSidebar(true);
         masterControls->setCurrentIndex(1);
         views->setCurrentIndex(1);
         trainWindow->selected(); // tell it!
@@ -1646,9 +1661,9 @@ MainWindow::selectTrain()
         scopebar->selected(3);
     #endif
         toolBox->setCurrentIndex(2);
-        setStyle();
     }
     currentWindow = trainWindow;
+    setStyle();
 }
 
 void
@@ -1666,7 +1681,12 @@ MainWindow::selectDiary()
     } else {
         masterControls->setVisible(true);
         toolBox->show();
-        side->show();
+#ifndef Q_OS_MAC
+        side->setEnabled(true);
+#else
+        scopebar->setEnabledHideButton(true);
+#endif
+		this->showSidebar(true);
         masterControls->setCurrentIndex(2);
         views->setCurrentIndex(2);
         diaryWindow->selected(); // tell it!
@@ -1679,9 +1699,9 @@ MainWindow::selectDiary()
     #endif
         toolBox->setCurrentIndex(1);
         gcCalendar->refresh(); // get that signal with the date range...
-        setStyle();
     }
     currentWindow = diaryWindow;
+    setStyle();
 }
 
 void
@@ -1700,7 +1720,12 @@ MainWindow::selectHome()
     } else {
         masterControls->setVisible(true);
         toolBox->show();
+#ifndef Q_OS_MAC
         side->setEnabled(true);
+#else
+        scopebar->setEnabledHideButton(true);
+#endif
+		this->showSidebar(true);
         masterControls->setCurrentIndex(3);
         views->setCurrentIndex(3);
         homeWindow->selected(); // tell it!
@@ -1712,9 +1737,9 @@ MainWindow::selectHome()
         scopebar->selected(0);
     #endif
         toolBox->setCurrentIndex(3);
-        setStyle();
     }
     currentWindow = homeWindow;
+    setStyle();
 }
 void
 MainWindow::selectAthlete()

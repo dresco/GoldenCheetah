@@ -48,7 +48,7 @@
 #include "LTMWindow.h"
 
 AllPlotWindow::AllPlotWindow(MainWindow *mainWindow) :
-    GcWindow(mainWindow), current(NULL), mainWindow(mainWindow), active(false), stale(true)
+    GcChartWindow(mainWindow), current(NULL), mainWindow(mainWindow), active(false), stale(true)
 {
     setInstanceName("Ride Plot Window");
 
@@ -69,50 +69,43 @@ AllPlotWindow::AllPlotWindow(MainWindow *mainWindow) :
     setContentsMargins(0,0,0,0);
 
     // Main layout
-    QGridLayout *mainLayout = new QGridLayout(this);
-    mainLayout->setContentsMargins(2,2,2,2);
+    //QGridLayout *mainLayout = new QGridLayout();
+    //mainLayout->setContentsMargins(2,2,2,2);
 
     //
     // reveal controls widget
     //
 
-    // reveal widget
-    revealControls = new QWidget(this);
-    revealControls->setFixedHeight(55);
-    revealControls->setStyleSheet("background-color: rgba(100%, 100%, 100%, 100%)");
-    revealControls->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-
     // reveal controls
-    rSmooth = new QLabel(tr("Smooth"), revealControls);
-    rSmoothEdit = new QLineEdit(revealControls);
+    rSmooth = new QLabel(tr("Smooth"));
+    rSmoothEdit = new QLineEdit();
     rSmoothEdit->setFixedWidth(30);
-    rSmoothSlider = new QSlider(Qt::Horizontal, revealControls);
+    rSmoothSlider = new QSlider(Qt::Horizontal);
     rSmoothSlider->setTickPosition(QSlider::TicksBelow);
     rSmoothSlider->setTickInterval(10);
     rSmoothSlider->setMinimum(1);
     rSmoothSlider->setMaximum(100);
-    rStack = new QCheckBox(tr("Stacked"), revealControls);
-    rFull = new QCheckBox(tr("Fullplot"), revealControls);
+    rStack = new QCheckBox(tr("Stacked"));
+    rFull = new QCheckBox(tr("Fullplot"));
 
     // layout reveal controls
     QHBoxLayout *r = new QHBoxLayout;
-    r->setContentsMargins(0,15,0,0);
+    r->setContentsMargins(0,0,0,0);
     r->addStretch();
     r->addWidget(rSmooth);
     r->addWidget(rSmoothEdit);
     r->addWidget(rSmoothSlider);
-    r->addSpacing(0);
     QVBoxLayout *v = new QVBoxLayout;
-    v->setSpacing(3);
     v->addWidget(rStack);
     v->addWidget(rFull);
-    v->addStretch(8); // a bit of space
+    r->addSpacing(20);
     r->addLayout(v);
     r->addStretch();
-    revealControls->setLayout(r);
+    setRevealLayout(r);
+    //revealControls->setLayout(r);
     
     // hide them initially
-    revealControls->hide();
+    //revealControls->hide();
 
     // setup the controls
     QLabel *showLabel = new QLabel(tr("Show"), c);
@@ -394,10 +387,12 @@ AllPlotWindow::AllPlotWindow(MainWindow *mainWindow) :
     vlayout->addWidget(stackFrame);
     vlayout->setSpacing(1);
 
-    mainLayout->addLayout(vlayout,0,0);
-    mainLayout->addWidget(revealControls,0,0, Qt::AlignTop);
-    revealControls->raise();
-    setLayout(mainLayout);
+    //mainLayout->addLayout(vlayout,0,0);
+    //mainLayout->addWidget(revealBackground,0,0, Qt::AlignTop);
+    //mainLayout->addWidget(revealControls,0,0, Qt::AlignTop);
+    //revealBackground->raise();
+    //revealControls->raise();
+    setChartLayout(vlayout);
 
     // common controls
     connect(showPower, SIGNAL(currentIndexChanged(int)), this, SLOT(setShowPower(int)));

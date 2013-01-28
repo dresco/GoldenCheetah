@@ -44,7 +44,7 @@ class ScatterSettings
 };
 
 
-class ScatterWindow : public GcWindow
+class ScatterWindow : public GcChartWindow
 {
     Q_OBJECT
     G_OBJECT
@@ -62,8 +62,6 @@ class ScatterWindow : public GcWindow
 
         // reveal
         bool hasReveal() { return true; }
-        void reveal() { revealControls->show(); }
-        void unreveal() { revealControls->hide(); }
 
         // set/get properties
         int xseries() const { return xSelector->currentIndex(); }
@@ -129,7 +127,6 @@ class ScatterWindow : public GcWindow
 
     private:
         // reveal controls
-        QWidget *revealControls;
         QxtStringSpinBox    *rxSelector,
                             *rySelector;
         QCheckBox           *rFrameInterval,
@@ -137,8 +134,6 @@ class ScatterWindow : public GcWindow
 
         void addStandardChannels(QComboBox *);
         void addrStandardChannels(QxtStringSpinBox *box);
-
-        bool _lockReveal;
 };
 
 #endif // _GC_ScatterWindow_h

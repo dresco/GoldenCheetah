@@ -34,7 +34,7 @@ class PowerHist;
 class RideItem;
 class RideFileCache;
 
-class HistogramWindow : public GcWindow
+class HistogramWindow : public GcChartWindow
 {
     Q_OBJECT
     G_OBJECT
@@ -63,8 +63,6 @@ class HistogramWindow : public GcWindow
 
         // reveal
         bool hasReveal() { return true; }
-        void reveal() { revealControls->show(); }
-        void unreveal() { revealControls->hide(); }
 
         // get/set properties
         int series() const { return seriesCombo->currentIndex(); }
@@ -146,7 +144,6 @@ class HistogramWindow : public GcWindow
         QComboBox *seriesCombo;         // Which data series to plot
 
         // reveal controls
-        QWidget *revealControls;
         QLabel *rWidth;
         QLineEdit *rBinEdit;    // set Bin Width from the line edit
         QSlider *rBinSlider;        // seet Bin Width from a slider

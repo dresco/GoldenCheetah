@@ -21,10 +21,11 @@
 #import "AppKit/NSButton.h"
 #import "AppKit/NSFont.h"
 
-static NSImage* fromQPixmap(const QPixmap &pixmap)
+static NSImage *fromQPixmap(const QPixmap &pixmap)
 {
-    CGImageRef cgImage = pixmap.toMacCGImageRef();
-    NSImage *image =[[NSImage alloc] initWithCGImage:cgImage size:NSZeroSize];
+    NSBitmapImageRep *bitmapRep = [[NSBitmapImageRep alloc] initWithCGImage:pixmap.toMacCGImageRef()];
+    NSImage *image = [[NSImage alloc] init];
+    [image addRepresentation:bitmapRep];
     [image setTemplate:true];
     return image;
 }
@@ -203,10 +204,7 @@ QtMacButton::QtMacButton(QWidget *parent, BezelStyle bezelStyle) : QWidget(paren
     [button setTarget:target];
 
     [button setAction:@selector(clicked)];
-
     setupLayout(button, this);
-
-    [button release];
 }
 
 void QtMacButton::setWidth(int x)

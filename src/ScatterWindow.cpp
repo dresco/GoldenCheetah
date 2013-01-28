@@ -63,31 +63,21 @@ ScatterWindow::addrStandardChannels(QxtStringSpinBox *box)
 }
 
 ScatterWindow::ScatterWindow(MainWindow *parent, const QDir &home) :
-    GcWindow(parent), home(home), main(parent), ride(NULL), current(NULL)
+    GcChartWindow(parent), home(home), main(parent), ride(NULL), current(NULL)
 {
     setInstanceName("2D Window");
-
-    // Main layout
-    QGridLayout *mainLayout = new QGridLayout(this);
-    mainLayout->setContentsMargins(2,2,2,2);
 
     //
     // reveal controls widget
     //
 
-    // reveal widget
-    revealControls = new QWidget(this);
-    revealControls->setFixedHeight(50);
-    revealControls->setStyleSheet("background-color: rgba(100%, 100%, 100%, 100%)");
-    revealControls->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
-
     // reveal controls
     QLabel *rxLabel = new QLabel(tr("X-Axis:"), this);
-    rxSelector = new QxtStringSpinBox(revealControls);
+    rxSelector = new QxtStringSpinBox();
     addrStandardChannels(rxSelector);
 
     QLabel *ryLabel = new QLabel(tr("Y-Axis:"), this);
-    rySelector = new QxtStringSpinBox(revealControls);
+    rySelector = new QxtStringSpinBox();
     addrStandardChannels(rySelector);
 
     rIgnore = new QCheckBox(tr("Ignore Zero"));
@@ -108,10 +98,7 @@ ScatterWindow::ScatterWindow(MainWindow *parent, const QDir &home) :
     r->addWidget(rIgnore);
     r->addWidget(rFrameInterval);
     r->addStretch();
-    revealControls->setLayout(r);
-
-    // hide them initially
-    revealControls->hide();
+    setRevealLayout(r);
 
     QWidget *c = new QWidget;
     QFormLayout *cl = new QFormLayout(c);
@@ -122,10 +109,7 @@ ScatterWindow::ScatterWindow(MainWindow *parent, const QDir &home) :
     QVBoxLayout *vlayout = new QVBoxLayout;
     vlayout->addWidget(scatterPlot);
 
-    mainLayout->addLayout(vlayout,0,0);
-    mainLayout->addWidget(revealControls,0,0, Qt::AlignTop);
-    revealControls->raise();
-    setLayout(mainLayout);
+    setChartLayout(vlayout);
 
     // labels
     xLabel = new QLabel(tr("X-Axis:"), this);

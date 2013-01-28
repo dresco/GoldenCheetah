@@ -47,6 +47,19 @@ PfPvWindow::PfPvWindow(MainWindow *mainWindow) :
     revealControls->setStyleSheet("background-color: rgba(100%, 100%, 100%, 100%)");
     revealControls->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Minimum);
 
+    revealAnim = new QPropertyAnimation(revealControls, "pos");
+    revealAnim->setDuration(500);
+    revealAnim->setEasingCurve(QEasingCurve(QEasingCurve::InSine));
+    revealAnim->setKeyValueAt(0,QPoint(2,-50));
+    revealAnim->setKeyValueAt(0.5,QPoint(2,15));
+    revealAnim->setKeyValueAt(1,QPoint(2,20));
+
+    unrevealAnim = new QPropertyAnimation(revealControls, "pos");
+    unrevealAnim->setDuration(500);
+    unrevealAnim->setKeyValueAt(0,QPoint(2,20));
+    unrevealAnim->setKeyValueAt(0.5,QPoint(2,15));
+    unrevealAnim->setKeyValueAt(1,QPoint(2,-50));
+
     // layout reveal controls
     QHBoxLayout *revealLayout = new QHBoxLayout;
     revealLayout->setContentsMargins(0,0,0,0);
@@ -65,6 +78,7 @@ PfPvWindow::PfPvWindow(MainWindow *mainWindow) :
     rFrameInterval->setCheckState(Qt::Checked);
 
     QVBoxLayout *checks = new QVBoxLayout;
+    checks->addStretch();
     checks->addWidget(rShade);
     checks->addWidget(rMergeInterval);
     checks->addWidget(rFrameInterval);

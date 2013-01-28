@@ -37,7 +37,7 @@ class QxtGroupBox;
 
 #include "LTMWindow.h" // for tooltip/canvaspicker
 
-class AllPlotWindow : public GcWindow
+class AllPlotWindow : public GcChartWindow
 {
     Q_OBJECT
     G_OBJECT
@@ -66,6 +66,8 @@ class AllPlotWindow : public GcWindow
 
         AllPlotWindow(MainWindow *mainWindow);
         void setData(RideItem *ride);
+
+        bool hasReveal() { return true; }
 
         // highlight a selection on the plots
         void setStartSelection(AllPlot* plot, double xValue);
@@ -128,11 +130,6 @@ class AllPlotWindow : public GcWindow
         void moveRight();
         void showStackChanged(int state);
 
-        // reveal
-        bool hasReveal() { return true; }
-        void reveal() { revealControls->show(); }
-        void unreveal() { revealControls->hide(); }
-
     protected:
 
         // whilst we refactor, lets make friend
@@ -187,7 +184,6 @@ class AllPlotWindow : public GcWindow
 
     private:
         // reveal controls
-        QWidget *revealControls;
         QLabel *rSmooth;
         QSlider *rSmoothSlider;
         QLineEdit *rSmoothEdit;
