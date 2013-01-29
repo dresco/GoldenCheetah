@@ -67,7 +67,7 @@
 #define BT_LOAD           50.00
 #define BT_GRADIENT       0.00
 
-#define BT_MESSAGE_SIZE   8
+#define BT_MESSAGE_SIZE   16
 
 class BudgetTrainer : public QThread
 {
@@ -94,6 +94,8 @@ public:
     void setMode(int mode,
         double load=100,                        // set mode to BT_ERGOMODE or BT_SSMODE
         double gradient=1);
+    void setRealTime(double speed,
+    		         double watts);				// Set speed and power (from other device)
 
     // GET
     int getMode();
@@ -125,13 +127,15 @@ private:
     volatile int mode;
     volatile double load;
     volatile double gradient;
+    volatile double speed;
+    volatile double watts;
 
     // Utility and BG Thread functions
     int openPort();
     int closePort();
 
     // Protocol encoding
-    void prepareCommand(int mode, double value);  // sets up the command packet according to current settings
+    void prepareCommand(int mode, double value, double speed, double watts);  // sets up the command packet according to current settings
     int sendCommand(int mode);      // writes a command to the device
 
     // Protocol decoding

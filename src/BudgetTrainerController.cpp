@@ -111,6 +111,7 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
 {
 	uint8_t Buttons;
 	double Load, Gradient;
+	double Speed, Watts;
 
     if(!myBudgetTrainer->isRunning())
     {
@@ -125,6 +126,11 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
     Buttons = myBudgetTrainer->getButtons();
     myBudgetTrainer->getRealtimeData(rtData);
     processRealtimeData(rtData);
+
+    // Push the realtime power/speed to budget trainer
+    Speed = rtData.getSpeed();
+    Watts = rtData.getWatts();
+    myBudgetTrainer->setRealTime(Speed, Watts);
 
     //
     // BUTTONS

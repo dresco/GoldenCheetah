@@ -29,16 +29,24 @@
 // 4             Target power - Lo Byte
 // 5             Target power - Hi Byte
 // 6             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
-// 7             0x00 -- UNUSED
+// 7             Actual speed - Lo Byte
+// 8			 Actual speed - Hi Byte
+// 9			 Actual power - Lo Byte
+// 10			 Actual power - Hi Byte
+// 11			 0x00 -- UNUSED
+// 12			 0x00 -- UNUSED
+// 13			 0x00 -- UNUSED
+// 14			 0x00 -- UNUSED
+// 15			 0x00 -- UNUSED
 
 const static uint8_t slope_command[BT_MESSAGE_SIZE] = {
-     // 0     1     2     3     4     5     6     7
-        0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00
+     // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
+        0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 const static uint8_t ergo_command[BT_MESSAGE_SIZE] = {
-     // 0     1     2     3     4     5     6     7
-        0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00
+	 // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
+        0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 /* ----------------------------------------------------------------------
@@ -75,6 +83,14 @@ void BudgetTrainer::setMode(int mode, double load, double gradient)
     this->mode = mode;
     this->load = load;
     this->gradient = gradient;
+    pvars.unlock();
+}
+
+void BudgetTrainer::setRealTime(double speed, double watts)
+{
+    pvars.lock();
+    this->speed = speed;
+    this->watts = watts;
     pvars.unlock();
 }
 
@@ -171,7 +187,7 @@ int BudgetTrainer::quit(int code)
     return 0; // never gets here obviously but shuts up the compiler!
 }
 
-void BudgetTrainer::prepareCommand(int mode, double value)
+void BudgetTrainer::prepareCommand(int mode, double value, double speed, double watts)
 {
     // prepare the control message according to the current mode and gradient/load
 
@@ -182,10 +198,24 @@ void BudgetTrainer::prepareCommand(int mode, double value)
         case BT_ERGOMODE :
             encoded = 10 * value;
             qToLittleEndian<int16_t>(encoded, &ERGO_Command[4]); // little endian
+
+            encoded = 10 * speed;
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[7]); // little endian
+
+            encoded = 10 * watts;
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[9]); // little endian
+
             break;
 
         case BT_SSMODE :
             SLOPE_Command[3] = (value + 10) * 10;
+
+            encoded = 10 * speed;
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[7]); // little endian
+
+            encoded = 10 * watts;
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[9]); // little endian
+
             break;
 
     }
@@ -220,6 +250,7 @@ void BudgetTrainer::run()
     // otherwise do nothing
     int curmode; //, curstatus;
     double curload, curgradient;
+    double curwatts, curspeed;
     int buttons;
 
 //    double curPower;                      // current output power in Watts
@@ -245,7 +276,7 @@ void BudgetTrainer::run()
     }
 
     // send first command
-    prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient);
+    prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient, curspeed, curwatts);
     if (sendCommand(curmode) == -1) {
 
         // send failed - ouch!
@@ -272,11 +303,13 @@ void BudgetTrainer::run()
         mode = curmode = this->mode; // XXX
         load = curload = newload = this->load;
         gradient = curgradient = newgradient = this->gradient;
+        curspeed = this->speed;
+        curwatts = this->watts;
         pvars.unlock();
 
     	// write gradient / power values to trainer
         if (isDeviceOpen == true) {
-            prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient);
+            prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient, curspeed, curwatts);
             if (sendCommand(curmode) == -1) {
                 // send failed - ouch!
                 closePort(); // need to release that file handle!!
