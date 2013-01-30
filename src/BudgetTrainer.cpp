@@ -155,10 +155,10 @@ void
 BudgetTrainer::getRealtimeData(RealtimeData &rtData)
 {
     // FIXME: bodge in some movement...
-    rtData.setSpeed(20);
-    rtData.setWatts(200);
-    rtData.setCadence(100);
-    rtData.setHr(140);
+    //rtData.setSpeed(20);
+    //rtData.setWatts(200);
+    //rtData.setCadence(100);
+    //rtData.setHr(140);
 }
 
 int
@@ -319,6 +319,8 @@ void BudgetTrainer::run()
 	        }
         qDebug() << "Gradient " << gradient;
         qDebug() << "Load " << load;
+        qDebug() << "Speed " << curspeed;
+        qDebug() << "Watts" << curwatts;
         qDebug() << "Mode " << mode;
         qDebug() << "Buttons " << buttons;
 
