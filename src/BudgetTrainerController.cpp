@@ -128,6 +128,9 @@ BudgetTrainerController::getRealtimeData(RealtimeData &rtData)
     processRealtimeData(rtData);
 
     // Push the realtime power/speed to budget trainer
+    // FIXME: Note that this only works if this device is addressed after
+    // the real provider of power/speed in TrainTool::guiUpdate(), this is
+    // dependent on the order multiple devices are selected in the device list
     Speed = rtData.getSpeed();
     Watts = rtData.getWatts();
     myBudgetTrainer->setRealTime(Speed, Watts);

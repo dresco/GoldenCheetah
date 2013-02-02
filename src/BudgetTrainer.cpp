@@ -264,6 +264,8 @@ void BudgetTrainer::run()
     curmode = this->mode;
     curload = this->load;
     curgradient = this->gradient;
+    curspeed = this->speed;
+    curwatts = this->watts;
     pvars.unlock();
 
     // open the device
