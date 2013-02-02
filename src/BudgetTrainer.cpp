@@ -39,12 +39,12 @@
 // 14			 0x00 -- UNUSED
 // 15			 0x00 -- UNUSED
 
-const static uint8_t slope_command[BT_MESSAGE_SIZE] = {
+const static uint8_t slope_command[BT_REQUEST_SIZE] = {
      // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
         0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
-const static uint8_t ergo_command[BT_MESSAGE_SIZE] = {
+const static uint8_t ergo_command[BT_REQUEST_SIZE] = {
 	 // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
         0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
@@ -60,8 +60,8 @@ BudgetTrainer::BudgetTrainer(QObject *parent,  QString devname) : QThread(parent
     load = BT_LOAD;
     mode = BT_ERGOMODE;
 
-    memcpy(ERGO_Command, ergo_command, BT_MESSAGE_SIZE);
-    memcpy(SLOPE_Command, slope_command, BT_MESSAGE_SIZE);
+    memcpy(ERGO_Command, ergo_command, BT_REQUEST_SIZE);
+    memcpy(SLOPE_Command, slope_command, BT_REQUEST_SIZE);
 }
 
 BudgetTrainer::~BudgetTrainer()
@@ -250,8 +250,8 @@ void BudgetTrainer::run()
     // otherwise do nothing
     int curmode; //, curstatus;
     double curload, curgradient;
-    double curwatts, curspeed;
-    int buttons;
+    double curwatts = 0, curspeed = 0;
+    int buttons = 0;
 
 //    double curPower;                      // current output power in Watts
 //    double curHeartRate;                  // current heartrate in BPM
@@ -291,7 +291,7 @@ void BudgetTrainer::run()
     	// get some telemetry back...
     	if (readMessage() > 0) {
             pvars.lock();
-            this->deviceButtons = curButtons = buttons = buf[6];
+            this->deviceButtons = curButtons = buttons = buf[2];
             pvars.unlock();
 
     	}
@@ -544,11 +544,11 @@ int BudgetTrainer::sendCommand(int mode)
     switch (mode) {
 
         case BT_ERGOMODE :
-            return rawWrite(ERGO_Command, BT_MESSAGE_SIZE);
+            return rawWrite(ERGO_Command, BT_REQUEST_SIZE);
             break;
 
         case BT_SSMODE :
-            return rawWrite(SLOPE_Command, BT_MESSAGE_SIZE);
+            return rawWrite(SLOPE_Command, BT_REQUEST_SIZE);
             break;
 
         default :
@@ -560,5 +560,5 @@ int BudgetTrainer::sendCommand(int mode)
 
 int BudgetTrainer::readMessage()
 {
-    return rawRead(buf, BT_MESSAGE_SIZE);
+    return rawRead(buf, BT_RESPONSE_SIZE);
 }

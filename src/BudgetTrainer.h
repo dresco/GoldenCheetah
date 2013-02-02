@@ -67,7 +67,10 @@
 #define BT_LOAD           50.00
 #define BT_GRADIENT       0.00
 
-#define BT_MESSAGE_SIZE   16
+//#define BT_MESSAGE_SIZE   16
+#define BT_REQUEST_SIZE 16
+#define BT_RESPONSE_SIZE 6
+
 
 class BudgetTrainer : public QThread
 {
@@ -111,11 +114,11 @@ private:
     DeviceConfiguration *devConf;
 
     // i/o message holder
-    uint8_t buf[BT_MESSAGE_SIZE];
+    uint8_t buf[BT_RESPONSE_SIZE];
 
-    // 8 byte command messages
-    uint8_t ERGO_Command[BT_MESSAGE_SIZE],
-            SLOPE_Command[BT_MESSAGE_SIZE];
+    // byte command messages
+    uint8_t ERGO_Command[BT_REQUEST_SIZE],
+            SLOPE_Command[BT_REQUEST_SIZE];
 
     // Mutex for controlling accessing private data
     QMutex pvars;
