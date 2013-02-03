@@ -197,7 +197,7 @@ void BudgetTrainer::prepareCommand(int mode, double value, double speed, double 
 
         case BT_ERGOMODE :
             encoded = 10 * value;
-            qToLittleEndian<int16_t>(encoded, &ERGO_Command[4]); // little endian
+            qToLittleEndian<int16_t>(encoded, &ERGO_Command[5]); // little endian
 
             encoded = 10 * speed;
             qToLittleEndian<int16_t>(encoded, &ERGO_Command[7]); // little endian
@@ -208,7 +208,7 @@ void BudgetTrainer::prepareCommand(int mode, double value, double speed, double 
             break;
 
         case BT_SSMODE :
-            SLOPE_Command[3] = (value + 10) * 10;
+            SLOPE_Command[4] = (value + 10) * 10;
 
             encoded = 10 * speed;
             qToLittleEndian<int16_t>(encoded, &ERGO_Command[7]); // little endian
@@ -291,12 +291,11 @@ void BudgetTrainer::run()
     while(running == true) {
 
     	// get some telemetry back...
-    	if (readMessage() > 0) {
-            pvars.lock();
-            this->deviceButtons = curButtons = buttons = buf[2];
-            pvars.unlock();
-
-    	}
+//    	if (readMessage() > 0) {
+//            pvars.lock();
+//            this->deviceButtons = curButtons = buttons = buf[2];
+//            pvars.unlock();
+//    	}
 
         //----------------------------------------------------------------
         // LISTEN TO GUI CONTROL COMMANDS
