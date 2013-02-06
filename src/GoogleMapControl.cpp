@@ -30,7 +30,7 @@
 
 #include <QDebug>
 
-GoogleMapControl::GoogleMapControl(MainWindow *mw) : GcWindow(mw), main(mw), range(-1), current(NULL)
+GoogleMapControl::GoogleMapControl(MainWindow *mw) : GcChartWindow(mw), main(mw), range(-1), current(NULL)
 {
     setInstanceName("Google Map");
     setControls(NULL);
@@ -38,7 +38,7 @@ GoogleMapControl::GoogleMapControl(MainWindow *mw) : GcWindow(mw), main(mw), ran
     layout = new QVBoxLayout();
     layout->setSpacing(0);
     layout->setContentsMargins(2,0,2,2);
-    setLayout(layout);
+    setChartLayout(layout);
 
     parent = mw;
     view = new QWebView();
@@ -51,6 +51,9 @@ GoogleMapControl::GoogleMapControl(MainWindow *mw) : GcWindow(mw), main(mw), ran
 
     webBridge = new WebBridge(mw, this);
 
+    //
+    // connects
+    //
     connect(this, SIGNAL(rideItemChanged(RideItem*)), this, SLOT(rideSelected()));
     connect(view->page()->mainFrame(), SIGNAL(javaScriptWindowObjectCleared()), this, SLOT(updateFrame()));
     connect(mw, SIGNAL(intervalsChanged()), webBridge, SLOT(intervalsChanged()));
@@ -63,9 +66,14 @@ GoogleMapControl::GoogleMapControl(MainWindow *mw) : GcWindow(mw), main(mw), ran
 void
 GoogleMapControl::rideSelected()
 {
-    // skip display if data drawn or invalid
-    if (myRideItem == NULL || !amVisible()) return;
     RideItem * ride = myRideItem;
+
+    // set/unset blank then decide what to do next
+    if (!ride || !ride->ride() || !ride->ride()->dataPoints().count()) setIsBlank(true);
+    else setIsBlank(false);
+
+    // skip display if data already drawn or invalid
+    if (myRideItem == NULL || !amVisible()) return;
     if (ride == current || !ride || !ride->ride()) return;
     else current = ride;
 
@@ -111,8 +119,10 @@ void GoogleMapControl::createHtml()
     // No GPS data, so sorry no map
     if(!ride || !ride->ride() || ride->ride()->areDataPresent()->lat == false || ride->ride()->areDataPresent()->lon == false) {
         currentPage = tr("No GPS Data Present");
+        setIsBlank(true);
         return;
-    }
+    } else
+        setIsBlank(false);
 
     // load the Google Map v3 API
     currentPage = QString("<!DOCTYPE html> \n"

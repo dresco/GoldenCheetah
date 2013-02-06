@@ -102,15 +102,29 @@ static inline NSString* fromQString(const QString &string)
 // scan for devices and stored details
 -(BOOL)discoverDevicesOfType:(WFSensorType_t)eSensorType onNetwork:(WFNetworkType_t)eNetworkType searchTimeout:(NSTimeInterval)timeout
 {
+    // get rid of past scans / stop any in progress
     [discoveredSensors removeAllObjects];
+    [[WFHardwareConnector sharedConnector] cancelDiscoveryOnNetwork:WF_NETWORKTYPE_BTLE];
+
+    // go looking
     [[WFHardwareConnector sharedConnector] discoverDevicesOfType:eSensorType onNetwork:eNetworkType searchTimeout:timeout]; //XXX ignoringreturn
     return true;
 }
 -(int)deviceCount { return [discoveredSensors count]; }
 -(NSString*)deviceUUID:(int)n
 {
-    WFDeviceParams* connParams = (WFDeviceParams*)[discoveredSensors objectAtIndex:n];
-    return connParams.deviceUUIDString;
+    WFConnectionParams* connParams = (WFConnectionParams*)[discoveredSensors objectAtIndex:n];
+    return connParams.device1.deviceUUIDString;
+}
+-(int)deviceType:(int)n
+{
+    WFConnectionParams* connParams = (WFConnectionParams*)[discoveredSensors objectAtIndex:n];
+    return (int)connParams.sensorType;
+}
+-(int)deviceSubType:(int)n
+{
+    WFConnectionParams* connParams = (WFConnectionParams*)[discoveredSensors objectAtIndex:n];
+    return (int)connParams.sensorSubType;
 }
 
 //============================================================================
@@ -214,12 +228,15 @@ static inline NSString* fromQString(const QString &string)
 // devices discovered
 -(void)hardwareConnector:(WFHardwareConnector*)hwConnector didDiscoverDevices:(NSSet*)connectionParams searchCompleted:(BOOL)bCompleted
 {   Q_UNUSED(hwConnector);
-    // add discovered devices.
-    for (WFConnectionParams* connParams in connectionParams) {
-        [discoveredSensors addObject:connParams.device1];
-    }   
 
-    qtw->didDiscoverDevices([connectionParams count], bCompleted);
+    if (!bCompleted) {
+        // add discovered devices -- as they are discovered, not at the end.
+        for (WFConnectionParams* connParams in connectionParams) {
+            [discoveredSensors addObject:connParams];
+        }   
+    }
+
+    qtw->didDiscoverDevices([discoveredSensors count], bCompleted);
 }
 
 -(NSAutoreleasePool*) getPool { return [[NSAutoreleasePool alloc] init]; }
@@ -252,19 +269,26 @@ bool WFApi::enableBTLE(bool enable, bool bondingmode) {
 int WFApi::currentState() { return [wf currentState]; }
 
 bool
-WFApi::discoverDevicesOfType(int eSensorType, int eNetworkType, int timeout)
-{   Q_UNUSED(eSensorType);
-    Q_UNUSED(eNetworkType);
-    Q_UNUSED(timeout);
-
+WFApi::discoverDevicesOfType(int eSensorType)
+{
     // ignore ehat was passed for now...
-    return [wf discoverDevicesOfType:WF_SENSORTYPE_BIKE_POWER onNetwork:WF_NETWORKTYPE_BTLE searchTimeout:5.00];
+    return [wf discoverDevicesOfType:(WFSensorType_t)eSensorType onNetwork:WF_NETWORKTYPE_BTLE searchTimeout:15.00];
 }
 
 QString WFApi::deviceUUID(int n)
 {
     if (n>=0 && n<deviceCount()) return toQString([wf deviceUUID:n]);
     else return "";
+}
+int WFApi::deviceType(int n)
+{
+    if (n>=0 && n<deviceCount()) return (int)[wf deviceType:n];
+    else return -1;
+}
+int WFApi::deviceSubType(int n)
+{
+    if (n>=0 && n<deviceCount()) return (int)[wf deviceSubType:n];
+    else return -1;
 }
 
 int WFApi::connectionStatus(int sd) { return [wf connectionStatus:(WFSensorConnection*)connections.at(sd)]; }
@@ -288,7 +312,8 @@ void WFApi::setLoad(int sd, int n) { [wf setLoad:(WFBikePowerConnection*)connect
 // methods called by delegate on updates
 //============================================================================
 void WFApi::connectedSensor(void*) { }
-void WFApi::didDiscoverDevices(int count, bool finished) { emit discoveredDevices(count,finished); }
+void WFApi::didDiscoverDevices(int count, bool finished) { if (finished) emit discoverFinished();
+                                                           else emit discoveredDevices(count,finished); }
 void WFApi::disconnectedSensor(void*) { }
 void WFApi::hasFirmwareUpdateAvalableForConnection() { }
 void WFApi::stateChanged() { emit currentStateChanged(currentState()); }

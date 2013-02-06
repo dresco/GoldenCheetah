@@ -24,6 +24,7 @@
 // 20. Scan for Device / select Serial
 // 30. Firmware for Fortius
 // 50. Pair for ANT
+// 55. Pair for BTLE
 // 60. Finalise
 //
 
@@ -38,7 +39,7 @@ AddDeviceWizard::AddDeviceWizard(MainWindow *main) : QWizard(main), main(main)
     setWindowModality(Qt::NonModal); // avoid blocking WFAPI calls for kickr
     setAttribute(Qt::WA_DeleteOnClose);
 
-    setFixedHeight(500);
+    setFixedHeight(530);
     setFixedWidth(550);
 
     // title
@@ -48,7 +49,8 @@ AddDeviceWizard::AddDeviceWizard(MainWindow *main) : QWizard(main), main(main)
     setPage(10, new AddType(this));   // done
     setPage(20, new AddSearch(this)); // done
     setPage(30, new AddFirmware(this)); // done
-    setPage(50, new AddPair(this));     // todo
+    setPage(50, new AddPair(this));     // done
+    setPage(55, new AddPairBTLE(this));     // done
     setPage(60, new AddFinal(this));    // todo -- including virtual power
 
     done = false;
@@ -122,7 +124,7 @@ AddType::clicked(QString p)
     // we don't do a quick scan for a kickr since it takes 15 seconds
     // to timeout and we don't want to get stuck on the front page for
     // that long -- it will seem like it has not worked / crashed
-    if (wizard->deviceTypes.Supported[wizard->current].type != DEV_KICKR)
+    if (wizard->deviceTypes.Supported[wizard->current].connector != DEV_BTLE)
         wizard->found = wizard->scanner->quickScan(false); // do a quick scan
     else
         wizard->found = false;
@@ -131,10 +133,11 @@ AddType::clicked(QString p)
     if (wizard->found == false) next =20;
     else {
         switch(wizard->deviceTypes.Supported[wizard->current].type) {
-        case DEV_KICKR : 
+        case DEV_BT40 : next = 55; break;
         case DEV_ANTLOCAL : next = 50; break; // pair 
         default:
         case DEV_BUDGET :
+        case DEV_KICKR :
         case DEV_CT : next = 60; break; // confirm and add 
         case DEV_FORTIUS : next = 30; break; // confirm and add 
         }
@@ -153,7 +156,7 @@ DeviceScanner::run()
 #ifdef GC_HAVE_WFAPI
     void *pool;
     // get an autorelease pool for this thread!
-    if (wizard->deviceTypes.Supported[wizard->current].type == DEV_KICKR) pool = WFApi::getInstance()->getPool();
+    if (wizard->deviceTypes.Supported[wizard->current].connector == DEV_BTLE) pool = WFApi::getInstance()->getPool();
 #endif
 
     for (int i=0; active && !result && i<50; i++) { // search for longer
@@ -185,6 +188,7 @@ DeviceScanner::quickScan(bool deep) // scan quickly or if true scan forever, as 
                                        // for now deep just means try 3 time before giving up, but we
                                        // may want to change that to include scanning more devices?
 {
+
     // get controller
     if (wizard->controller) {
         delete wizard->controller;
@@ -204,6 +208,7 @@ DeviceScanner::quickScan(bool deep) // scan quickly or if true scan forever, as 
     case DEV_ANTLOCAL : wizard->controller = new ANTlocalController(NULL, NULL); break;
 #ifdef GC_HAVE_WFAPI
     case DEV_KICKR : wizard->controller = new KickrController(NULL, NULL); break;
+    case DEV_BT40 : wizard->controller = new BT40Controller(NULL, NULL); break;
 #endif
 
     default: wizard->controller = NULL; break;
@@ -255,7 +260,7 @@ DeviceScanner::quickScan(bool deep) // scan quickly or if true scan forever, as 
 
 #ifdef GC_HAVE_WFAPI
     // save away the device UUID, so we can choose it when connecting.
-    if (isfound && wizard->deviceTypes.Supported[wizard->current].type == DEV_KICKR) 
+    if (isfound && wizard->deviceTypes.Supported[wizard->current].connector == DEV_BTLE) 
         wizard->portSpec = ((KickrController*)(wizard->controller))->id();
 #endif
 
@@ -343,7 +348,6 @@ AddSearch::chooseCOMPort()
 void
 AddSearch::initializePage()
 {
-    active = true;
     setTitle(QString(tr("%1 Search")).arg(wizard->deviceTypes.Supported[wizard->current].name));
 
     // we only ask for the device file if it is a serial device
@@ -384,16 +388,24 @@ AddSearch::scanFinished(bool result)
     stop->setText("Search Again");
 
     if (result == true) { // woohoo we found one
-        bar->hide();
-        stop->hide();
-        manual->hide();
-        label->hide();
-        label1->hide();
-        if (wizard->portSpec != "")
-            label2->setText(QString("\nDevice found (%1).\nPress Next to Continue\n").arg(wizard->portSpec));
-        else
-            label2->setText("\nDevice found.\nPress Next to Continue\n");
-        label2->show();
+
+        if (wizard->deviceTypes.Supported[wizard->current].type == DEV_BT40) {
+            // ok we've started finding devices, lets go straight into the
+            // pair screen since we now want to see the data etc.
+            wizard->next();
+        } else {
+
+            bar->hide();
+            stop->hide();
+            manual->hide();
+            label->hide();
+            label1->hide();
+            if (wizard->portSpec != "")
+                label2->setText(QString("\nDevice found (%1).\nPress Next to Continue\n").arg(wizard->portSpec));
+            else
+                label2->setText("\nDevice found.\nPress Next to Continue\n");
+            label2->show();
+        }
     } 
     QApplication::processEvents();
     emit completeChanged();
@@ -437,6 +449,7 @@ AddSearch::nextId() const
     else {
         switch(wizard->deviceTypes.Supported[wizard->current].type) {
         case DEV_ANTLOCAL : return 50; break; // pair 
+        case DEV_BT40 : return 55; break; // pair BT devices
         default:
         case DEV_KICKR :
         case DEV_CT : return 60; break; // confirm and add 
@@ -787,6 +800,234 @@ AddPair::getChannelValues()
 
 bool
 AddPair::validatePage()
+{
+    // when next is clicked we need to get the paired values
+    // and create a profile, a blank profile will be created if
+    // no devices have been paired. This means devices will be
+    // automatically paired at runtime
+    wizard->profile="";
+    for (int i=0; i< channelWidget->invisibleRootItem()->childCount(); i++) {
+        QTreeWidgetItem *item = channelWidget->invisibleRootItem()->child(i);
+
+        // what is it then? unused or restart scan?
+        QComboBox *p = dynamic_cast<QComboBox *>(channelWidget->itemWidget(item,0));
+        int channel_type = p->itemData(p->currentIndex()).toInt();
+
+        if (channel_type == ANTChannel::CHANNEL_TYPE_UNUSED) continue; // not paired
+
+        int device_number = dynamic_cast<QLineEdit*>(channelWidget->itemWidget(item,1))->text().toInt();
+
+        if (device_number)
+            wizard->profile += QString(wizard->profile != "" ? ", %1%2" : "%1%2")
+                               .arg(device_number)
+                               .arg(ANT::deviceIdCode(channel_type));
+    }
+    return true;
+}
+
+// Pair devices
+AddPairBTLE::AddPairBTLE(AddDeviceWizard *parent) : QWizardPage(parent), wizard(parent)
+{
+    setTitle(tr("Pair Devices"));
+    setSubTitle(tr("Search for and pair Bluetooth 4.0 devices"));
+
+    signalMapper = NULL;
+
+    QVBoxLayout *layout = new QVBoxLayout;
+    setLayout(layout);
+
+    channelWidget = new QTreeWidget(this);
+    layout->addWidget(channelWidget);
+}
+
+void
+AddPairBTLE::cleanupPage()
+{
+    updateValues.stop();
+    if (wizard->controller) {
+        wizard->controller->stop();
+#ifdef WIN32
+        Sleep(1000);
+#else
+        sleep(1);
+#endif
+        delete wizard->controller;
+        wizard->controller = NULL;
+    }
+}
+
+void
+AddPairBTLE::initializePage()
+{
+#ifdef GC_HAVE_WFAPI
+qDebug()<<"found this many devices:"<<WFApi::getInstance()->deviceCount();
+#endif
+
+    // setup the controller and start it off so we can
+    // manipulate it
+    if (wizard->controller) delete wizard->controller;
+    if (signalMapper) delete signalMapper;
+    wizard->controller = new ANTlocalController(NULL,NULL);
+    dynamic_cast<ANTlocalController*>(wizard->controller)->setDevice(wizard->portSpec);
+    dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->setConfigurationMode(true); //XXX
+    wizard->controller->start();
+    wizard->profile=""; // clear any thing thats there now
+    signalMapper = new QSignalMapper(this);
+
+    // Channel 0, look for any (0 devicenumber) speed and distance device
+
+    // wait for it to start
+#ifdef WIN32
+    Sleep(1000);
+#else
+    sleep(1);
+#endif
+    int channels = dynamic_cast<ANTlocalController*>(wizard->controller)->channels();
+
+    // Tree Widget of the channel controls
+    channelWidget->clear();
+    channelWidget->headerItem()->setText(0, tr("Sensor"));
+    channelWidget->headerItem()->setText(1, tr("ANT+ Id"));
+    channelWidget->headerItem()->setText(2, tr("Value"));
+    channelWidget->headerItem()->setText(3, tr("Status"));
+    channelWidget->setColumnCount(4);
+    channelWidget->setSelectionMode(QAbstractItemView::NoSelection);
+    //channelWidget->setEditTriggers(QAbstractItemView::SelectedClicked); // allow edit
+    channelWidget->setUniformRowHeights(true);
+    channelWidget->setIndentation(0);
+
+    channelWidget->header()->resizeSection(0,175); // type 
+    channelWidget->header()->resizeSection(1,75); // id
+    channelWidget->header()->resizeSection(2,120); // value
+    channelWidget->header()->resizeSection(3,110); // status
+
+    // defaults
+    static const int index4[4] = { 1,2,3,5 };
+    static const int index8[8] = { 1,2,3,4,5,0,0,0 };
+    const int *index = channels == 4 ? index4 : index8;
+
+    // how many devices we got then?
+    for (int i=0; i< channels; i++) {
+
+        QTreeWidgetItem *add = new QTreeWidgetItem(channelWidget->invisibleRootItem());
+        add->setFlags(add->flags() | Qt::ItemIsEditable);
+
+        // sensor type
+        QComboBox *sensorSelector = new QComboBox(this);
+        addSensorTypes(dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal, sensorSelector);
+        sensorSelector->setCurrentIndex(index[i]);
+        channelWidget->setItemWidget(add, 0, sensorSelector);
+
+        // sensor id
+        QLineEdit *sensorId = new QLineEdit(this);
+        sensorId->setEnabled(false);
+        sensorId->setText("none");
+        channelWidget->setItemWidget(add, 1, sensorId);
+
+        // value
+        QLabel *value = new QLabel(this);
+        QFont bigger;
+        bigger.setPointSize(25);
+        value->setFont(bigger);
+        value->setAlignment(Qt::AlignCenter | Qt::AlignVCenter);
+        value->setText("0");
+        channelWidget->setItemWidget(add, 2, value);
+
+        // status
+        QLabel *status = new QLabel(this);
+        status->setText("Un-Paired");
+        channelWidget->setItemWidget(add, 3, status);
+
+        //channelWidget->verticalHeader()->resizeSection(i,40)
+        connect(sensorSelector, SIGNAL(currentIndexChanged(int)), signalMapper, SLOT(map()));
+        signalMapper->setMapping(sensorSelector, i);
+    }
+    channelWidget->setCurrentItem(channelWidget->invisibleRootItem()->child(0));
+    enableDisable(channelWidget);
+
+    updateValues.start(200); // 5hz
+    connect(signalMapper, SIGNAL(mapped(int)), this, SLOT(sensorChanged(int)));
+    connect(&updateValues, SIGNAL(timeout()), this, SLOT(getChannelValues()));
+    connect(wizard->controller, SIGNAL(foundDevice(int,int,int)), this, SLOT(channelInfo(int,int,int)));
+    connect(wizard->controller, SIGNAL(searchTimeout(int)), this, SLOT(searchTimeout(int)));
+    //connect(wizard->controller, SIGNAL(lostDevice(int)), this, SLOT(searchTimeout(int)));
+
+    // now we're ready to get notifications - set channels
+    for (int i=0; i<channels; i++) sensorChanged(i);
+
+}
+
+void
+AddPairBTLE::sensorChanged(int channel)
+{
+    QTreeWidgetItem *item = channelWidget->invisibleRootItem()->child(channel);
+    enableDisable(channelWidget);
+
+    // first off lets unassign this channel
+    dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->setChannel(channel, -1, 0);
+    dynamic_cast<QLineEdit*>(channelWidget->itemWidget(item,1))->setText("none");
+    dynamic_cast<QLabel*>(channelWidget->itemWidget(item,2))->setText(0);
+
+    // what is it then? unused or restart scan?
+    QComboBox *p = dynamic_cast<QComboBox *>(channelWidget->itemWidget(item,0));
+    int channel_type = p->itemData(p->currentIndex()).toInt();
+    if (channel_type == ANTChannel::CHANNEL_TYPE_UNUSED) {
+        dynamic_cast<QLabel*>(channelWidget->itemWidget(item,3))->setText("Unused");
+    } else {
+        dynamic_cast<QLabel*>(channelWidget->itemWidget(item,3))->setText("Searching...");
+    dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->setChannel(channel, 0, channel_type);
+    }
+}
+
+void
+AddPairBTLE::channelInfo(int channel, int device_number, int device_id)
+{
+    Q_UNUSED(device_id);
+    QTreeWidgetItem *item = channelWidget->invisibleRootItem()->child(channel);
+    dynamic_cast<QLineEdit *>(channelWidget->itemWidget(item,1))->setText(QString("%1").arg(device_number));
+    dynamic_cast<QLabel *>(channelWidget->itemWidget(item,3))->setText(QString("Paired"));
+}
+
+void
+AddPairBTLE::searchTimeout(int channel)
+{
+    // Kick if off again, just mimic user reselecting the same sensor type
+    sensorChanged(channel);
+}
+
+
+void 
+AddPairBTLE::getChannelValues()
+{
+    if (wizard->controller == NULL) return;
+
+    // enable disable widgets based upon sensor selection
+    for (int i=0; i< channelWidget->invisibleRootItem()->childCount(); i++) {
+        QTreeWidgetItem *item = channelWidget->invisibleRootItem()->child(i);
+
+        // is it selected or not?
+        bool enable = (dynamic_cast<QComboBox*>(channelWidget->itemWidget(item,0))->currentIndex() != 0);
+
+        if (enable) {
+            QComboBox *p =dynamic_cast<QComboBox*>(channelWidget->itemWidget(item,0));
+
+            // speed+cadence is two values!
+            if (p->itemData(p->currentIndex()) == ANTChannel::CHANNEL_TYPE_SandC) {
+            dynamic_cast<QLabel *>(channelWidget->itemWidget(item,2))->setText(QString("%1 %2")
+                .arg((int)dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->channelValue2(i) //speed
+                          * (appsettings->value(NULL, GC_WHEELSIZE, 2100).toInt()/1000) * 60 / 1000)
+                .arg((int)dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->channelValue(i))); // cad
+            } else {
+            dynamic_cast<QLabel *>(channelWidget->itemWidget(item,2))->setText(QString("%1")
+                .arg((int)dynamic_cast<ANTlocalController*>(wizard->controller)->myANTlocal->channelValue(i)));
+            }
+        }
+    }
+    
+}
+
+bool
+AddPairBTLE::validatePage()
 {
     // when next is clicked we need to get the paired values
     // and create a profile, a blank profile will be created if

@@ -42,7 +42,7 @@
 
 static int supported_axes[] = { QwtPlot::yLeft, QwtPlot::yRight, QwtPlot::yLeft1, QwtPlot::yRight1, QwtPlot::yLeft2, QwtPlot::yRight2, QwtPlot::yLeft3, QwtPlot::yRight3 };
 
-LTMPlot::LTMPlot(LTMPlotContainer *parent, MainWindow *main, QDir home) : bg(NULL), parent(parent), main(main),
+LTMPlot::LTMPlot(LTMWindow *parent, MainWindow *main, QDir home) : bg(NULL), parent(parent), main(main),
                                                                    home(home), highlighter(NULL)
 {
     setInstanceName("Metric Plot");
@@ -932,13 +932,13 @@ LTMPlot::createPMCCurveData(LTMSettings *settings, MetricDetail metricDetail,
     QString scoreType;
 
     // create a custom set of summary metric data!
-    if (metricDetail.name.startsWith("Skiba")) {
+    if (metricDetail.symbol.startsWith("skiba")) {
         scoreType = "skiba_bike_score";
-    } else if (metricDetail.name.startsWith("Coggan")) {
+    } else if (metricDetail.symbol.startsWith("coggan")) {
         scoreType = "coggan_tss";
-    } else if (metricDetail.name.startsWith("Daniels")) {
+    } else if (metricDetail.symbol.startsWith("daniels")) {
         scoreType = "daniels_points";
-    } else if (metricDetail.name.startsWith("TRIMP")) {
+    } else if (metricDetail.symbol.startsWith("trimp")) {
         scoreType = "trimp_points";
     }
 
@@ -1405,7 +1405,7 @@ class LTMPlotZoneLabel: public QwtPlotItem
 void
 LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
 {
-    // clear old markers
+    // clear old markers - if there are any
     foreach(QwtPlotMarker *m, markers) {
         m->detach();
         delete m;
@@ -1415,29 +1415,11 @@ LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
     double baseday = groupForDate(from, groupby);
 
     // seasons and season events
-    foreach (Season s, main->seasons->seasons) {
+    if (settings->events) {
+        foreach (Season s, main->seasons->seasons) {
 
-        if (s.type != Season::temporary && s.name != settings->title && s.getStart() >= from && s.getStart() < to) {
+            if (s.type != Season::temporary && s.name != settings->title && s.getStart() >= from && s.getStart() < to) {
 
-            QwtPlotMarker *mrk = new QwtPlotMarker;
-            markers.append(mrk);
-            mrk->attach(this);
-            mrk->setLineStyle(QwtPlotMarker::VLine);
-            mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-            mrk->setLinePen(QPen(GColor(CPLOTMARKER), 0, Qt::DashDotLine));
-
-            QwtText text(s.getName());
-            text.setFont(QFont("Helvetica", 10, QFont::Bold));
-            text.setColor(GColor(CPLOTMARKER));
-            mrk->setValue(double(groupForDate(s.getStart(), groupby)) - baseday, 0.0);
-            mrk->setLabel(text);
-        }
-
-        foreach (SeasonEvent event, s.events) {
-
-            if (event.date > from && event.date < to) {
-
-                // and the events...
                 QwtPlotMarker *mrk = new QwtPlotMarker;
                 markers.append(mrk);
                 mrk->attach(this);
@@ -1445,14 +1427,33 @@ LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
                 mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
                 mrk->setLinePen(QPen(GColor(CPLOTMARKER), 0, Qt::DashDotLine));
 
-                QwtText text(event.name);
+                QwtText text(s.getName());
                 text.setFont(QFont("Helvetica", 10, QFont::Bold));
                 text.setColor(GColor(CPLOTMARKER));
-                mrk->setValue(double(groupForDate(event.date, groupby)) - baseday, 10.0);
+                mrk->setValue(double(groupForDate(s.getStart(), groupby)) - baseday, 0.0);
                 mrk->setLabel(text);
             }
-        }
 
+            foreach (SeasonEvent event, s.events) {
+
+                if (event.date > from && event.date < to) {
+
+                    // and the events...
+                    QwtPlotMarker *mrk = new QwtPlotMarker;
+                    markers.append(mrk);
+                    mrk->attach(this);
+                    mrk->setLineStyle(QwtPlotMarker::VLine);
+                    mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
+                    mrk->setLinePen(QPen(GColor(CPLOTMARKER), 0, Qt::DashDotLine));
+
+                    QwtText text(event.name);
+                    text.setFont(QFont("Helvetica", 10, QFont::Bold));
+                    text.setColor(GColor(CPLOTMARKER));
+                    mrk->setValue(double(groupForDate(event.date, groupby)) - baseday, 10.0);
+                    mrk->setLabel(text);
+                }
+            }
+        }
     }
     return;
 }

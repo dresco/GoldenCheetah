@@ -17,65 +17,71 @@
  */
 
 #include <QProgressDialog>
-#include "KickrController.h"
+#include "BT40Controller.h"
 #include "RealtimeData.h"
 
-KickrController::KickrController(TrainTool *parent, DeviceConfiguration *dc) : RealtimeController(parent, dc)
+BT40Controller::BT40Controller(TrainTool *parent, DeviceConfiguration *dc) : RealtimeController(parent, dc)
 {
-    myKickr = new Kickr(parent, dc);
-    connect(myKickr, SIGNAL(foundDevice(QString,int)), this, SIGNAL(foundDevice(QString,int)));
+    myBT40 = new BT40(parent, dc);
+    connect(myBT40, SIGNAL(foundDevice(QString,int)), this, SIGNAL(foundDevice(QString,int)));
+}
+
+BT40Controller::~BT40Controller()
+{
+    myBT40->stop();
+    myBT40->deleteLater();
 }
 
 void
-KickrController::setDevice(QString)
+BT40Controller::setDevice(QString)
 {
     // not required
 }
 
 int
-KickrController::start()
+BT40Controller::start()
 {
-    myKickr->start();
+    myBT40->start();
     return 0;
 }
 
 
 int
-KickrController::restart()
+BT40Controller::restart()
 {
-    return myKickr->restart();
+    return myBT40->restart();
 }
 
 
 int
-KickrController::pause()
+BT40Controller::pause()
 {
-    return myKickr->pause();
+    return myBT40->pause();
 }
 
 
 int
-KickrController::stop()
+BT40Controller::stop()
 {
-    return myKickr->stop();
+    return myBT40->stop();
 }
 
 bool
-KickrController::find()
+BT40Controller::find()
 {
-    return myKickr->find();
+    return myBT40->find();
 }
 
 bool
-KickrController::discover(QString name)
+BT40Controller::discover(QString name)
 {
-    return myKickr->discover(name);
+    return myBT40->discover(name);
 }
 
 
-bool KickrController::doesPush() { return false; }
-bool KickrController::doesPull() { return true; }
-bool KickrController::doesLoad() { return true; }
+bool BT40Controller::doesPush() { return false; }
+bool BT40Controller::doesPull() { return true; }
+bool BT40Controller::doesLoad() { return true; }
 
 /*
  * gets called from the GUI to get updated telemetry.
@@ -84,20 +90,20 @@ bool KickrController::doesLoad() { return true; }
  *
  */
 void
-KickrController::getRealtimeData(RealtimeData &rtData)
+BT40Controller::getRealtimeData(RealtimeData &rtData)
 {
-    if(!myKickr->isRunning())
+    if(!myBT40->isRunning())
     {
         QMessageBox msgBox;
-        msgBox.setText("Cannot Connect to Kickr");
+        msgBox.setText("Cannot Connect to BT40");
         msgBox.setIcon(QMessageBox::Critical);
         msgBox.exec();
         parent->Stop(1);
         return;
     }
     // get latest telemetry
-    myKickr->getRealtimeData(rtData);
+    myBT40->getRealtimeData(rtData);
     processRealtimeData(rtData);
 }
 
-void KickrController::pushRealtimeData(RealtimeData &) { } // update realtime data with current values
+void BT40Controller::pushRealtimeData(RealtimeData &) { } // update realtime data with current values

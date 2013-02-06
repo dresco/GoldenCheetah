@@ -21,19 +21,20 @@
 #include "DeviceConfiguration.h"
 #include "ConfigDialog.h"
 
-#include "Kickr.h"
+#include "BT40.h"
 
-#ifndef _GC_KickrController_h
-#define _GC_KickrController_h 1
+#ifndef _GC_BT40Controller_h
+#define _GC_BT40Controller_h 1
 
-class KickrController : public RealtimeController
+class BT40Controller : public RealtimeController
 {
     Q_OBJECT
 
 public:
-    KickrController (TrainTool *parent =0, DeviceConfiguration *dc =0);
+    BT40Controller (TrainTool *parent =0, DeviceConfiguration *dc =0);
+    ~BT40Controller();
 
-    Kickr *myKickr;               // the device itself
+    BT40 *myBT40;               // the device itself
 
     int start();
     int restart();                              // restart after paused
@@ -49,11 +50,11 @@ public:
     void getRealtimeData(RealtimeData &rtData);
     void pushRealtimeData(RealtimeData &rtData);
 
-    void setLoad(double x) { myKickr->setLoad(x); }
-    void setGradient(double x) { myKickr->setGradient(x); }
-    void setMode(int x) { myKickr->setMode(x); }
+    void setLoad(double x) { myBT40->setLoad(x); }
+    void setGradient(double x) { myBT40->setGradient(x); }
+    void setMode(int x) { myBT40->setMode(x); }
 
-    QString id() { return myKickr->id(); }
+    QString id() { return myBT40->id(); }
 
 signals:
     void foundDevice(QString uuid, int type);
@@ -62,4 +63,4 @@ private:
     
 };
 
-#endif // _GC_KickrController_h
+#endif // _GC_BT40Controller_h

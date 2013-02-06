@@ -26,6 +26,7 @@
 #include "RealtimeController.h"
 #ifdef GC_HAVE_WFAPI
 #include "KickrController.h"
+#include "BT40Controller.h"
 #endif
 #ifdef GC_HAVE_LIBUSB
 #include "FortiusController.h"
@@ -146,6 +147,34 @@ class AddPair : public QWizardPage
 
     public:
         AddPair(AddDeviceWizard *);
+        int nextId() const { return 60; }
+        void initializePage();
+        bool validatePage();
+        void cleanupPage();
+
+    public slots:
+
+        void getChannelValues();
+        // we found a device on a channel
+        void channelInfo(int channel, int device_number, int device_id);
+        // we failed to find a device on the channel
+        void searchTimeout(int channel);
+
+        // user interactions
+        void sensorChanged(int channel); // sensor selection changed
+    private:
+        AddDeviceWizard *wizard;
+        QTreeWidget *channelWidget;
+        QSignalMapper *signalMapper;
+        QTimer updateValues;
+};
+
+class AddPairBTLE : public QWizardPage
+{
+    Q_OBJECT
+
+    public:
+        AddPairBTLE(AddDeviceWizard *);
         int nextId() const { return 60; }
         void initializePage();
         bool validatePage();

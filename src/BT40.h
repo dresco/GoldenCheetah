@@ -16,8 +16,8 @@
  * Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#ifndef _GC_Kickr_h
-#define _GC_Kickr_h 1
+#ifndef _GC_BT40_h
+#define _GC_BT40_h 1
 #include "GoldenCheetah.h"
 
 #include <QString>
@@ -31,13 +31,13 @@
 
 #include "WFApi.h"
 
-class Kickr : public QThread
+class BT40 : public QThread
 {
     Q_OBJECT
 
 public:
-    Kickr(QObject *parent=0, DeviceConfiguration * devConf=0);       // pass device
-    ~Kickr();
+    BT40(QObject *parent=0, DeviceConfiguration * devConf=0);       // pass device
+    ~BT40();
 
     QObject *parent;
 
@@ -58,8 +58,8 @@ public:
         double gradient=1);
 
     bool find();
-    int connectKickr();
-    int disconnectKickr();
+    int connectBT40();
+    int disconnectBT40();
 
     int getMode();
     double getGradient();
@@ -97,5 +97,5 @@ private:
     void *pool;
 };
 
-#endif // _GC_Kickr_h
+#endif // _GC_BT40_h
 

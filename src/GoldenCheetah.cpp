@@ -38,7 +38,7 @@ void GcWindow::setControls(QWidget *x)
 
     if (x != NULL) {
         menu->clear();
-        menu->addAction(tr("Chart Settings"), this, SIGNAL(showControls()));
+        menu->addAction(tr("All Chart Settings"), this, SIGNAL(showControls()));
         menu->addAction(tr("Close"), this, SLOT(_closeWindow()));
     }
 }
@@ -685,7 +685,6 @@ GcChartWindow::GcChartWindow(QWidget *parent) : GcWindow(parent) {
     //
     setContentsMargins(0,0,0,0);
 
-    // Main layout
     _layout = new QStackedLayout();
     setLayout(_layout);
 
@@ -698,6 +697,7 @@ GcChartWindow::GcChartWindow(QWidget *parent) : GcWindow(parent) {
     _layout->addWidget(_mainWidget);
     _layout->setCurrentWidget(_mainWidget);
 
+    // Main layout
     _mainLayout = new QGridLayout();
     _mainLayout->setContentsMargins(2,2,2,2);
 
@@ -728,21 +728,66 @@ GcChartWindow::GcChartWindow(QWidget *parent) : GcWindow(parent) {
 
     _mainLayout->addWidget(_revealControls,0,0, Qt::AlignTop);
     _mainWidget->setLayout(_mainLayout);
+
+    //
+    // Default Blank layout
+    //
+    _defaultBlankLayout = new QVBoxLayout();
+    _defaultBlankLayout->setAlignment(Qt::AlignCenter);
+    _defaultBlankLayout->setContentsMargins(10,10,10,10);
+
+    QToolButton *blankImg = new QToolButton(this);
+    blankImg->setFocusPolicy(Qt::NoFocus);
+    blankImg->setToolButtonStyle(Qt::ToolButtonIconOnly);
+    blankImg->setStyleSheet("QToolButton {text-align: left;color : blue;background: transparent}");
+    blankImg->setSizePolicy(QSizePolicy::MinimumExpanding,QSizePolicy::MinimumExpanding);
+
+    blankImg->setIcon(QPixmap(":/images/gc-blank.png"));
+    blankImg->setIconSize(QSize(200,200)); //512
+
+    QLabel *blankLabel = new QLabel(tr("No data available"));
+    blankLabel->setAlignment(Qt::AlignCenter);
+    QFont font;
+    font.setPointSize(font.pointSize() + 4);
+    font.setWeight(QFont::Bold);
+    blankLabel->setFont(font);
+
+    _defaultBlankLayout->addStretch();
+    _defaultBlankLayout->addWidget(blankImg);
+    _defaultBlankLayout->addWidget(blankLabel);
+    _defaultBlankLayout->addStretch();
+    _blank->setLayout(_defaultBlankLayout);
 }
 
-void GcChartWindow:: setChartLayout(QLayout *layout)
+void
+GcChartWindow:: setChartLayout(QLayout *layout)
 {
     _chartLayout = layout;
     _mainLayout->addLayout(_chartLayout,0,0, Qt::AlignTop);
 }
 
-void GcChartWindow:: setRevealLayout(QLayout *layout)
+void
+GcChartWindow:: setRevealLayout(QLayout *layout)
 {
     _revealLayout = layout;
     _revealControls->setLayout(_revealLayout);
 }
 
-void GcChartWindow:: reveal()
+void
+GcChartWindow:: setBlankLayout(QLayout *layout)
+{
+    _blankLayout = layout;
+    _blank->setLayout(layout);
+}
+
+void
+GcChartWindow:: setIsBlank(bool value)
+{
+    _layout->setCurrentWidget(value?_blank:_mainWidget);
+}
+
+void
+GcChartWindow:: reveal()
 {
     _unrevealTimer->stop();
     _revealControls->raise();

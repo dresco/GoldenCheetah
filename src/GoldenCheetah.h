@@ -201,8 +201,12 @@ private:
 
     QStackedLayout *_layout;
     QGridLayout *_mainLayout;
+    QVBoxLayout *_defaultBlankLayout;
+
     QLayout *_chartLayout,
-            *_revealLayout;
+            *_revealLayout,
+            *_blankLayout;
+
     QWidget *_mainWidget;
     QWidget *_blank;
     QWidget *_chart;
@@ -225,6 +229,9 @@ public:
 
     void setChartLayout(QLayout *layout);
     void setRevealLayout(QLayout *layout);
+    void setBlankLayout(QLayout *layout);
+
+    void setIsBlank(bool value);
 
 public slots:
     void hideRevealControls();
