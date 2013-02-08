@@ -20,33 +20,49 @@
 #include "BudgetTrainer.h"
 
 //
-// Outbound control message has the format:
+// Outbound control (request) message has the format:
+//
 // Byte          Value / Meaning
+//
+// 0             0xAA CONSTANT (device code)
+// 1             0x01 CONSTANT (version code)
+// 2             Mode - 0x01 = ergo, 0x02 = slope, 0x4 = calibrate -- ever used inbound?
+// 3             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
+// 4             Target gradient - (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
+// 5             Target load - Lo Byte
+// 6             Target load - Hi Byte
+// 7             Realtime speed - Lo Byte
+// 8             Realtime speed - Hi Byte
+// 9             Realtime power - Lo Byte
+// 10            Realtime power - Hi Byte
+// 11            0x00 -- UNUSED
+// 12            0x00 -- UNUSED
+// 13            0x00 -- UNUSED
+// 14            0x00 -- UNUSED
+// 15            0x00 -- UNUSED
+//
+//
+// Inbound status (response) message has the format:
+//
+// Byte          Value / Meaning
+//
 // 0             0xAA CONSTANT
 // 1             0x01 CONSTANT
-// 2             Mode - 0x01 = ergo, 0x02 = slope, 0x4 = calibrate
-// 3             Target gradient (percentage + 10 * 10, i.e. -5% = 50, 0% = 100, 10% = 200)
-// 4             Target power - Lo Byte
-// 5             Target power - Hi Byte
-// 6             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
-// 7             Actual speed - Lo Byte
-// 8			 Actual speed - Hi Byte
-// 9			 Actual power - Lo Byte
-// 10			 Actual power - Hi Byte
-// 11			 0x00 -- UNUSED
-// 12			 0x00 -- UNUSED
-// 13			 0x00 -- UNUSED
-// 14			 0x00 -- UNUSED
-// 15			 0x00 -- UNUSED
+// 2             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
+// 3             Target motor position (1 to 100)
+// 4             Current motor position (1 to 100)
+// 5             0x00 -- UNUSED
+
+
 
 const static uint8_t slope_command[BT_REQUEST_SIZE] = {
      // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
-        0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+        0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 const static uint8_t ergo_command[BT_REQUEST_SIZE] = {
-	 // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
-        0xAA, 0x01, 0x02, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
+     // 0     1     2     3     4     5     6     7     8     9     10    11    12    13    14    15
+        0xAA, 0x01, 0x01, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00
 };
 
 /* ----------------------------------------------------------------------
@@ -211,10 +227,10 @@ void BudgetTrainer::prepareCommand(int mode, double value, double speed, double 
             SLOPE_Command[4] = (value + 10) * 10;
 
             encoded = 10 * speed;
-            qToLittleEndian<int16_t>(encoded, &ERGO_Command[7]); // little endian
+            qToLittleEndian<int16_t>(encoded, &SLOPE_Command[7]); // little endian
 
             encoded = 10 * watts;
-            qToLittleEndian<int16_t>(encoded, &ERGO_Command[9]); // little endian
+            qToLittleEndian<int16_t>(encoded, &SLOPE_Command[9]); // little endian
 
             break;
 
@@ -266,6 +282,7 @@ void BudgetTrainer::run()
     curgradient = this->gradient;
     curspeed = this->speed;
     curwatts = this->watts;
+    this->deviceButtons = 0;
     pvars.unlock();
 
     // open the device
@@ -290,12 +307,12 @@ void BudgetTrainer::run()
 
     while(running == true) {
 
-    	// get some telemetry back...
-//    	if (readMessage() > 0) {
-//            pvars.lock();
-//            this->deviceButtons = curButtons = buttons = buf[2];
-//            pvars.unlock();
-//    	}
+        // get some telemetry back...
+        if (readMessage() > 0) {
+            pvars.lock();
+            this->deviceButtons = curButtons = buttons = buf[2];
+            pvars.unlock();
+        }
 
         //----------------------------------------------------------------
         // LISTEN TO GUI CONTROL COMMANDS
@@ -308,7 +325,7 @@ void BudgetTrainer::run()
         curwatts = this->watts;
         pvars.unlock();
 
-    	// write gradient / power values to trainer
+        // write gradient / power values to trainer
         if (isDeviceOpen == true) {
             prepareCommand(curmode, curmode == BT_ERGOMODE ? curload : curgradient, curspeed, curwatts);
             if (sendCommand(curmode) == -1) {
@@ -317,7 +334,7 @@ void BudgetTrainer::run()
                 isDeviceOpen = false;
                 quit(4);
                 return; // couldn't write to the device
-	        }
+            }
         qDebug() << "Gradient " << gradient;
         qDebug() << "Load " << load;
         qDebug() << "Speed " << curspeed;
@@ -325,7 +342,11 @@ void BudgetTrainer::run()
         qDebug() << "Mode " << mode;
         qDebug() << "Buttons " << buttons;
 
-        msleep(500);
+        // Note that there is an interaction with the frequency that BudgetTrainerController:getRealTimeData
+        // is called from TrainTool::GuiUpdate. As the BudgetTrainer firmware only passes the lap button event
+        // once (to avoid multiple increments), if we retrieve the state here multiple times between each iteration
+        // of getRealTimeData, then we increase the chance of missing that event. 200ms seems to work well..
+        msleep(200);
         }
     }
 
@@ -383,7 +404,7 @@ int BudgetTrainer::openPort()
     // set raw mode i.e. ignbrk, brkint, parmrk, istrip, inlcr, igncr, icrnl, ixon
     //                   noopost, cs8, noecho, noechonl, noicanon, noisig, noiexn
     cfmakeraw(&deviceSettings);
-    cfsetspeed(&deviceSettings, B2400);
+    cfsetspeed(&deviceSettings, B38400);
 
     // further attributes
     deviceSettings.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ICANON | ISTRIP | IXON | IXOFF | IXANY);
@@ -420,9 +441,9 @@ int BudgetTrainer::openPort()
     QString portSpec;
     int portnum = deviceFilename.midRef(3).toString().toInt();
     if (portnum < 10)
-	   portSpec = deviceFilename;
+       portSpec = deviceFilename;
     else
-	   portSpec = "\\\\.\\" + deviceFilename;
+       portSpec = "\\\\.\\" + deviceFilename;
     wchar_t deviceFilenameW[32]; // \\.\COM32 needs 9 characters, 32 should be enough?
     MultiByteToWideChar(CP_ACP, 0, portSpec.toAscii(), -1, (LPWSTR)deviceFilenameW,
                     sizeof(deviceFilenameW));
@@ -556,10 +577,19 @@ int BudgetTrainer::sendCommand(int mode)
             return -1;
             break;
     }
-	return 0; // never gets here
+    return 0; // never gets here
 }
 
 int BudgetTrainer::readMessage()
 {
-    return rawRead(buf, BT_RESPONSE_SIZE);
+    int i;
+
+    i = rawRead(buf, BT_RESPONSE_SIZE);
+
+    if (i > 0)
+    {
+        if ((buf[0] == 0xAA) && buf[1] == 0x01)
+            return i;
+    }
+    return -1;
 }
