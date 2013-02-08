@@ -170,6 +170,14 @@ double BudgetTrainer::getGradient()
 void
 BudgetTrainer::getRealtimeData(RealtimeData &rtData)
 {
+	// massive temporary bodge, poke the current resistance back into heart rate
+	// field - just so that we can get it into the metrics for initial calibration..
+    int tmp;
+    pvars.lock();
+    tmp = this->deviceResistance;
+    pvars.unlock();
+    rtData.setHr(tmp);
+
     // FIXME: bodge in some movement...
     //rtData.setSpeed(20);
     //rtData.setWatts(200);
@@ -267,13 +275,14 @@ void BudgetTrainer::run()
     int curmode; //, curstatus;
     double curload, curgradient;
     double curwatts = 0, curspeed = 0;
-    int buttons = 0;
+    uint8_t buttons = 0, resistance = 0;
 
 //    double curPower;                      // current output power in Watts
 //    double curHeartRate;                  // current heartrate in BPM
 //    double curCadence;                    // current cadence in RPM
 //    double curSpeed;                      // current speef in KPH
-    int curButtons;                       // Button status
+    uint8_t curButtons;                     // Button status
+    uint8_t curResistance;                  // Current resistance setting (debug/calibration)
 
     // initialise local cache & main vars
     pvars.lock();
@@ -311,6 +320,7 @@ void BudgetTrainer::run()
         if (readMessage() > 0) {
             pvars.lock();
             this->deviceButtons = curButtons = buttons = buf[2];
+            this->deviceResistance = curResistance = resistance = buf[4];
             pvars.unlock();
         }
 
@@ -341,6 +351,7 @@ void BudgetTrainer::run()
         qDebug() << "Watts" << curwatts;
         qDebug() << "Mode " << mode;
         qDebug() << "Buttons " << buttons;
+        qDebug() << "Resistance " << resistance;
 
         // Note that there is an interaction with the frequency that BudgetTrainerController:getRealTimeData
         // is called from TrainTool::GuiUpdate. As the BudgetTrainer firmware only passes the lap button event
@@ -404,7 +415,7 @@ int BudgetTrainer::openPort()
     // set raw mode i.e. ignbrk, brkint, parmrk, istrip, inlcr, igncr, icrnl, ixon
     //                   noopost, cs8, noecho, noechonl, noicanon, noisig, noiexn
     cfmakeraw(&deviceSettings);
-    cfsetspeed(&deviceSettings, B38400);
+    cfsetspeed(&deviceSettings, B9600);
 
     // further attributes
     deviceSettings.c_iflag &= ~(IGNBRK | BRKINT | ICRNL | INLCR | PARMRK | INPCK | ICANON | ISTRIP | IXON | IXOFF | IXANY);
