@@ -125,6 +125,7 @@ private:
 
     // inbound telemetry
     volatile uint8_t deviceButtons;
+    volatile uint8_t deviceResistance;
 
     bool running, connected;
     volatile int mode;
