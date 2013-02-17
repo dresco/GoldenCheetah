@@ -272,8 +272,8 @@ void ErgFile::parseComputrainer(QString p)
     bool bIsMetric = true;
 
     // running totals for CRS file format
-    long rdist = 0; // running total for distance
-    long ralt = 200; // always start at 200 meters just to prettify the graph
+    double rdist = 0; // running total for distance
+    double ralt = 200; // always start at 200 meters just to prettify the graph
 
     // open the file
     if (p == "" && ergFile.open(QIODevice::ReadOnly | QIODevice::Text) == false) {
@@ -444,7 +444,9 @@ void ErgFile::parseComputrainer(QString p)
                 // gradient and altitude
                 add.val = absoluteSlope.cap(2).toDouble();
                 add.y = ralt;
-                ralt += distance * add.val / 100; /* paused */
+                //ralt += distance * add.val / 100; /* paused */
+                volatile double temp = distance * add.val / 100;
+                ralt += temp;
 
                 Points.append(add);
                 if (add.y > MaxWatts) MaxWatts=add.y;
