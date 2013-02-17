@@ -179,13 +179,99 @@ RealtimeController::processRealtimeData(RealtimeData &rtData)
         }
         break;
 
+    case 15 : //  TACX SATORI SETTING 2
+        {
+        double V = rtData.getSpeed();
+        double slope = 5.33;
+        double intercept = -36.67;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 16 : //  TACX SATORI SETTING 4
+        {
+        double V = rtData.getSpeed();
+        double slope = 8.27;
+        double intercept = -47.33;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 17 : //  TACX SATORI SETTING 6
+        {
+        double V = rtData.getSpeed();
+        double slope = 11.400;
+        double intercept = -67.00;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 18 : //  TACX SATORI SETTING 8
+        {
+        double V = rtData.getSpeed();
+        double slope = 14.40;
+        double intercept = -82.00;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 19 : //  TACX SATORI SETTING 10
+        {
+        double V = rtData.getSpeed();
+        double slope = 17.73;
+        double intercept = -114.67;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 20 : //  TACX FLOW SETTING 0
+        {
+        double V = rtData.getSpeed();
+        double slope = 7.75;
+        double intercept = -47.27;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 21 : //  TACX FLOW SETTING 2
+        {
+        double V = rtData.getSpeed();
+        double slope = 9.51;
+        double intercept = -66.69;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 22 : //  TACX FLOW SETTING 4
+        {
+        double V = rtData.getSpeed();
+        double slope = 11.03;
+        double intercept = -71.59;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 23 : //  TACX FLOW SETTING 6
+        {
+        double V = rtData.getSpeed();
+        double slope = 12.81;
+        double intercept = -95.05;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
+    case 24 : //  TACX FLOW SETTING 8
+        {
+        double V = rtData.getSpeed();
+        double slope = 14.37;
+        double intercept = -102.43;
+        rtData.setWatts((slope * V) + intercept);
+        }
+        break;
+
     default : // unknown - do nothing
         break;
     }
-    // if calculating but no cadence then power must be set to zero
-    // XXX But if there is not cadence device present the virtual
-    //     power will never work! So commented out.
-    // if (dc->postProcess && !rtData.getCadence()) rtData.setWatts(0);
 }
 
 // for future devices, we may need to setup algorithmic tables etc

@@ -49,7 +49,9 @@ struct FitDefinition {
 
 /* FIT has uint32 as largest integer type. So qint64 is large enough to
  * store all integer types - no matter if they're signed or not */
-// XXX this needs to get changed to support non-integer values
+
+// this will need to change if float or other non-integer values are 
+// introduced into the file format
 typedef qint64 fit_value_t;
 #define NA_VALUE std::numeric_limits<fit_value_t>::max()
 
@@ -83,7 +85,6 @@ struct FitFileReaderState
     void read_unknown( int size, int *count = NULL ){
         char c[size+1];
 
-        // XXX: just seek instead of read?
         if (file.read(c, size ) != size)
             throw TruncatedRead();
         if (count)
@@ -228,7 +229,10 @@ struct FitFileReaderState
                 case 1036: rideFile->setDeviceType("Garmin Edge 500"); break;
                 case 1124: rideFile->setDeviceType("Garmin FR110"); break;
                 case 1169: rideFile->setDeviceType("Garmin Edge 800"); break;
-                default: rideFile->setDeviceType(QString("Unknown Garmin Device %1").arg(prod));
+                case 1325: rideFile->setDeviceType("Garmin Edge 200"); break;
+                case 20119: rideFile->setDeviceType("Garmin Training Center"); break;
+                case 65534: rideFile->setDeviceType("Garmin Connect Website"); break;
+                default: rideFile->setDeviceType(QString("Garmin %1").arg(prod));
             }
         }
         else {
@@ -238,7 +242,6 @@ struct FitFileReaderState
     }
 
     void decodeEvent(const FitDefinition &def, int, const std::vector<fit_value_t> values) {
-        time_t time = 0;
         int event = -1;
         int event_type = -1;
         int i = 0;
@@ -249,7 +252,8 @@ struct FitFileReaderState
                 continue;
 
             switch (field.num) {
-                case 253: time = value + qbase_time.toTime_t(); break;
+                case 253: //time = value + qbase_time.toTime_t();
+                          break;
                 case 0: event = value; break;
                 case 1: event_type = value; break;
                 default: ; // do nothing
@@ -326,8 +330,8 @@ struct FitFileReaderState
         time_t time = 0;
         if (time_offset > 0)
             time = last_time + time_offset;
-        double alt = 0, cad = 0, km = 0, grade = 0, hr = 0, lat = 0, lng = 0, badgps = 0, lrbalance = 0;
-        double resistance = 0, kph = 0, temperature = RideFile::noTemp, time_from_course = 0, watts = 0;
+        double alt = 0, cad = 0, km = 0, hr = 0, lat = 0, lng = 0, badgps = 0, lrbalance = 0;
+        double kph = 0, temperature = RideFile::noTemp, watts = 0;
         fit_value_t lati = NA_VALUE, lngi = NA_VALUE;
         int i = 0;
         foreach(const FitField &field, def.fields) {
@@ -351,11 +355,14 @@ struct FitFileReaderState
                 case 5: km = value / 100000.0; break;
                 case 6: kph = value * 3.6 / 1000.0; break;
                 case 7: watts = value; break;
-                case 8: break; // XXX packed speed/dist
-                case 9: grade = value / 100.0; break;
-                case 10: resistance = value; break;
-                case 11: time_from_course = value / 1000.0; break;
-                case 12: break; // XXX "cycle_length"
+                case 8: break; // packed speed/dist
+                case 9: //grade = value / 100.0;
+                        break;
+                case 10: //resistance = value;
+                        break;
+                case 11: //time_from_course = value / 1000.0;
+                         break;
+                case 12: break; // "cycle_length"
                 case 13: temperature = value; break;
                 case 30: lrbalance = (value & 0x80 ? 100 - (value & 0x7F) : value & 0x7F);break;
 
@@ -385,7 +392,7 @@ struct FitFileReaderState
             badgps = 1;
         }
         if (start_time == 0) {
-            start_time = time - 1; // XXX: recording interval?
+            start_time = time - 1; // recording interval?
             QDateTime t;
             t.setTime_t(start_time);
             rideFile->setStartTime(t);
@@ -521,7 +528,7 @@ struct FitFileReaderState
                     case 10: v = read_uint8z(&count); break;
                     case 11: v = read_uint16z(def.is_big_endian, &count); break;
                     case 12: v = read_uint32z(def.is_big_endian, &count); break;
-                    //XXX: support float, string + byte base types
+                    // we may need to add support for float, string + byte base types here
                     default:
                         read_unknown( field.size, &count );
                         v = NA_VALUE;
@@ -559,8 +566,8 @@ struct FitFileReaderState
 
     RideFile * run() {
         rideFile = new RideFile;
-        rideFile->setDeviceType("Garmin FIT"); // XXX: read from device msg?
-        rideFile->setRecIntSecs(1.0); // XXX: always?
+        rideFile->setDeviceType("Garmin FIT");
+        rideFile->setRecIntSecs(1.0); // this is a terrible assumption!
         if (!file.open(QIODevice::ReadOnly)) {
             delete rideFile;
             return NULL;

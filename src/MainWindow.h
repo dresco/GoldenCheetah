@@ -29,7 +29,6 @@
 #include "IntervalItem.h"
 #include "IntervalTreeView.h"
 #include "GcWindowRegistry.h"
-#include "QuarqdClient.h"
 #include "RealtimeData.h"
 #include "SpecialFields.h"
 #include "TimeUtils.h"
@@ -299,7 +298,6 @@ class MainWindow : public QMainWindow
 #endif
         void importFile();
         void importWorkout();
-        void findBestIntervals();
         void addIntervals();
         void addIntervalForPowerPeaksForSecs(RideFile *ride, int windowSizeSecs, QString name);
         void findPowerPeaks();
@@ -375,8 +373,6 @@ class MainWindow : public QMainWindow
 
     protected:
 
-        static QString notesFileName(QString rideFileName);
-
     private:
         QSharedPointer<QSettings> settings;
         IntervalItem *activeInterval; // currently active for context menu popup
@@ -435,15 +431,13 @@ class MainWindow : public QMainWindow
         IntervalTreeView *intervalWidget;
 
         // Miscellany
-        QuarqdClient *client;
         QSignalMapper *toolMapper;
         WithingsDownload *withingsDownload;
         ZeoDownload *zeoDownload;
-        bool parseRideFileName(const QString &name, QString *notesFileName, QDateTime *dt);
+        bool parseRideFileName(const QString &name, QDateTime *dt);
 
 #ifdef Q_OS_MAC
         // Mac Native Support
-        QWidget *toolBarWidgets;
         QWidget *macAnalButtons;
         QtMacButton *import, *compose;
         QtMacSegmentedButton *styleSelector;

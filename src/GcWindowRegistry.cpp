@@ -41,7 +41,6 @@
 #include "PerformanceManagerWindow.h"
 #include "PfPvWindow.h"
 #include "HrPwWindow.h"
-#include "RaceWindow.h" // XXX not done
 #include "RideEditor.h"
 #include "RideNavigator.h"
 #include "RideSummaryWindow.h"
@@ -49,7 +48,6 @@
 #include "SummaryWindow.h"
 #include "MetadataWindow.h"
 #include "TreeMapWindow.h"
-#include "WeeklySummaryWindow.h"
 #include "DialWindow.h"
 #include "RealtimePlotWindow.h"
 #include "SpinScanPlotWindow.h"
@@ -106,7 +104,7 @@ GcWindowRegistry::initialize()
 
 // instantiate a new window
 GcWindow *
-GcWindowRegistry::newGcWindow(GcWinID id, MainWindow *main) //XXX mainWindow will go soon
+GcWindowRegistry::newGcWindow(GcWinID id, MainWindow *main)
 {
     GcWindow *returning = NULL;
 
@@ -138,7 +136,7 @@ GcWindowRegistry::newGcWindow(GcWinID id, MainWindow *main) //XXX mainWindow wil
     case GcWindowTypes::Scatter: returning = new ScatterWindow(main, main->home); break;
     case GcWindowTypes::Summary: returning = new SummaryWindow(main); break;
     case GcWindowTypes::TreeMap: returning = new TreeMapWindow(main, main->useMetricUnits, main->home); break;
-    case GcWindowTypes::WeeklySummary: returning = new WeeklySummaryWindow(main->useMetricUnits, main); break;
+    case GcWindowTypes::WeeklySummary: returning = new SummaryWindow(main); break; // deprecated
 #if defined Q_OS_MAC || defined GC_HAVE_VLC // mac uses Quicktime / Win/Linux uses VLC
     case GcWindowTypes::VideoPlayer: returning = new VideoWindow(main, main->home); break;
 #else

@@ -57,24 +57,6 @@ ModelWindow::ModelWindow(MainWindow *parent, const QDir &home) :
     nodata = new QLabel(tr("No data or bin size too large."), this);
     nodata->hide();
 
-    //
-    // reveal controls
-    //
-    rpresetLabel = new QLabel(tr("Analyse"), this);
-    rpresetValues = new QComboBox;
-    fillPresets(rpresetValues);
-    rpresetValues->setCurrentIndex(1);
-
-    // layout reveal controls
-    QHBoxLayout *r = new QHBoxLayout;
-    r->setSpacing(4);
-    r->setContentsMargins(0,0,0,0);
-    r->addStretch();
-    r->addWidget(rpresetLabel);
-    r->addWidget(rpresetValues);
-    r->addStretch();
-    setRevealLayout(r);
-
     // the plot widget
     QHBoxLayout *mainLayout = new QHBoxLayout;
     modelPlot= new ModelPlot(main, NULL);
@@ -243,9 +225,9 @@ ModelWindow::setData(bool adjustPlot)
     settings.y = ySelector->itemData(ySelector->currentIndex()).toInt();
     settings.z = zSelector->itemData(zSelector->currentIndex()).toInt();
     settings.color = colorSelector->itemData(colorSelector->currentIndex()).toInt();
-    settings.xbin = binWidthSlider->value(); // XXX fixed to single bin width
-    settings.ybin = binWidthSlider->value(); // XXX due to issues with bar geometry
-    settings.crop = false; // XXX not implemented
+    settings.xbin = binWidthSlider->value();
+    settings.ybin = binWidthSlider->value();
+    settings.crop = false; // not implemented yet
     settings.zpane = 0;
     settings.ignore = ignore->isChecked();
     settings.gridlines = grid->isChecked();

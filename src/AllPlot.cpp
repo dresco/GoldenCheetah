@@ -249,7 +249,7 @@ AllPlot::AllPlot(AllPlotWindow *parent, MainWindow *mainWindow):
     if (appsettings->value(this, GC_SHADEZONES, true).toBool()==false)
         shade_zones = false;
 
-    if (smooth < 1) smooth = 1;
+    smooth = 1;
 
     // create a background object for shading
     bg = new AllPlotBackground(this);
@@ -858,13 +858,8 @@ AllPlot::setYMax()
         QwtValueList xytick[QwtScaleDiv::NTickTypes];
         for (int i=0;i<maxY;i+=step)
             xytick[QwtScaleDiv::MajorTick]<<i;
-#if 0
-        for (int i=0;i<maxY;i+=25)
-            xytick[QwtScaleDiv::MinorTick]<<i;
-#endif
 
         setAxisTitle(yLeft, tr("Watts"));
-        //setAxisScale(yLeft, 0.0, maxY);
         setAxisScaleDiv(QwtPlot::yLeft,QwtScaleDiv(0.0,maxY,xytick));
         setAxisLabelRotation(yLeft,270);
         setAxisLabelAlignment(yLeft,Qt::AlignVCenter);

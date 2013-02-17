@@ -153,13 +153,7 @@ LTMWindow::LTMWindow(MainWindow *parent, bool useMetricUnits, const QDir &home) 
     // connect pickers to ltmPlot
     connect(_canvasPicker, SIGNAL(pointHover(QwtPlotCurve*, int)), ltmPlot, SLOT(pointHover(QwtPlotCurve*, int)));
     connect(_canvasPicker, SIGNAL(pointClicked(QwtPlotCurve*, int)), ltmPlot, SLOT(pointClicked(QwtPlotCurve*, int)));
-    connect(picker, SIGNAL(moved(QPoint)), ltmPlot, SLOT(pickerMoved(QPoint)));
-    connect(picker, SIGNAL(appended(const QPoint &)), ltmPlot, SLOT(pickerAppended(const QPoint &)));
 
-    // config changes or ride file activities cause a redraw/refresh (but only if visible)
-    //connect(main, SIGNAL(rideSelected()), this, SLOT(rideSelected(void)));
-    //XXX no longer needed since we use dateRange not rideItem for LTM plots on home view
-    //XXX connect(this, SIGNAL(rideItemChanged(RideItem*)), this, SLOT(rideSelected()));
     connect(main, SIGNAL(rideAdded(RideItem*)), this, SLOT(refresh(void)));
     connect(main, SIGNAL(rideDeleted(RideItem*)), this, SLOT(refresh(void)));
     connect(main, SIGNAL(configChanged()), this, SLOT(refresh()));
@@ -167,31 +161,11 @@ LTMWindow::LTMWindow(MainWindow *parent, bool useMetricUnits, const QDir &home) 
 
 LTMWindow::~LTMWindow()
 {
-    //qDebug()<<"delete metricdb... crash!!!";
-    //if (metricDB != NULL) delete metricDB; //XXX CRASH!!!! -- needs fixing
     delete popup;
 }
 
 void
-LTMWindow::rideSelected()
-{
-#if 0
-    if (active == true) {
-
-        // mimic user first selection now that
-        // we are active - choose a chart and
-        // use the first available date range
-        ltmTool->selectDateRange(0);
-        chartSelected(0);
-    if (amVisible() == true && dirty == true) {
-
-        // plot needs to be redrawn
-        refresh();
-    } else if (amVisible() == false) {
-        popup->hide();
-    }
-#endif
-}
+LTMWindow::rideSelected() { } // deprecated
 
 void
 LTMWindow::refreshPlot()
@@ -278,12 +252,8 @@ LTMWindow::dateRangeChanged(DateRange range)
     settings.data = &results;
     settings.measures = &measures;
 
-    // apply filter to new date range too -- will refresh plot
+    // apply filter to new date range too -- will also refresh plot
     filterChanged();
-
-    //XXX not needed since filter changed will also
-    //XXX call refreshPlot();
-    //refreshPlot();
 }
 
 void

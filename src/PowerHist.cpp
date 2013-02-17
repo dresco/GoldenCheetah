@@ -42,7 +42,24 @@
 
 #include "LTMCanvasPicker.h" // for tooltip
 
+// discritized unit for smoothing
+static const double wattsDelta = 1.0;
+static const double wattsKgDelta = 0.01;
+static const double nmDelta    = 0.1;
+static const double hrDelta    = 1.0;
+static const double kphDelta   = 0.1;
+static const double cadDelta   = 1.0;
+
+// digits for text entry validator
+static const int wattsDigits = 0;
+static const int wattsKgDigits = 2;
+static const int nmDigits    = 1;
+static const int hrDigits    = 0;
+static const int kphDigits   = 1;
+static const int cadDigits   = 0;
+
 PowerHist::PowerHist(MainWindow *mainWindow):
+    minX(0),
     rideItem(NULL),
     mainWindow(mainWindow),
     series(RideFile::watts),
@@ -52,7 +69,6 @@ PowerHist::PowerHist(MainWindow *mainWindow):
     binw(3),
     withz(true),
     dt(1),
-    minX(0),
     absolutetime(true),
     cache(NULL),
     source(Ride)
@@ -184,23 +200,6 @@ PowerHist::~PowerHist() {
     delete curveSelected;
     delete grid;
 }
-
-// static const variables from PoweHist.h:
-// discritized unit for smoothing
-const double PowerHist::wattsDelta;
-const double PowerHist::wattsKgDelta;
-const double PowerHist::nmDelta;
-const double PowerHist::hrDelta;
-const double PowerHist::kphDelta;
-const double PowerHist::cadDelta;
-
-// digits for text entry validator
-const int PowerHist::wattsDigits;
-const int PowerHist::wattsKgDigits;
-const int PowerHist::nmDigits;
-const int PowerHist::hrDigits;
-const int PowerHist::kphDigits;
-const int PowerHist::cadDigits;
 
 void
 PowerHist::refreshZoneLabels()
@@ -528,14 +527,14 @@ PowerHist::recalc(bool force)
         if (source == Cache && zoned && (series == RideFile::watts || series == RideFile::wattsKg) && mainWindow->zones()) {
             setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(mainWindow->zones(), 0));
             if (mainWindow->zones()->getRangeSize())
-                setAxisScale(QwtPlot::xBottom, -0.99, mainWindow->zones()->numZones(0), 1); // XXX use zones from first defined range
+                setAxisScale(QwtPlot::xBottom, -0.99, mainWindow->zones()->numZones(0), 1); // use zones from first defined range
         }
 
         // hr zoned for a time range
         if (source == Cache && zoned && series == RideFile::hr && mainWindow->hrZones()) {
             setAxisScaleDraw(QwtPlot::xBottom, new HrZoneScaleDraw(mainWindow->hrZones(), 0));
             if (mainWindow->hrZones()->getRangeSize())
-                setAxisScale(QwtPlot::xBottom, -0.99, mainWindow->hrZones()->numZones(0), 1); // XXX use zones from first defined range
+                setAxisScale(QwtPlot::xBottom, -0.99, mainWindow->hrZones()->numZones(0), 1); // use zones from first defined range
         }
 
         setAxisMaxMinor(QwtPlot::xBottom, 0);

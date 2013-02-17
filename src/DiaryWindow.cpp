@@ -48,25 +48,11 @@ DiaryWindow::DiaryWindow(MainWindow *mainWindow) :
     prev->setFlat(true);
 #endif
 
-#if 0
-    // viewMode - monthly or weekly
-    viewMode = new QComboBox;
-    viewMode->addItem("View Month");
-    viewMode->addItem("View Week"); // we can add more later...
-    viewMode->addItem("View Ride"); // we can add more later...
-    viewMode->setFixedWidth(120);
-
-    viewMode->setCurrentIndex(appsettings->cvalue(mainWindow->cyclist, GC_DIARY_VIEW, "1").toInt());
-#endif
-
     controls->addWidget(prev);
     controls->addWidget(next);
     controls->addStretch();
     controls->addWidget(title, Qt::AlignCenter | Qt::AlignVCenter);
     controls->addStretch();
-#if 0
-    controls->addWidget(viewMode);
-#endif
 
     vlayout->addLayout(controls);
 
@@ -84,19 +70,8 @@ DiaryWindow::DiaryWindow(MainWindow *mainWindow) :
     monthlyView->setGridStyle(Qt::DotLine);
     monthlyView->setFrameStyle(QFrame::NoFrame);
 
-    // weekly view via QxtScheduleView
-    weeklyView = new QxtScheduleView;
-    weeklyViewProxy = new QxtScheduleViewProxy(this, &fieldDefinitions, mainWindow);
-    weeklyViewProxy->setSourceModel(mainWindow->listView->sqlModel);
-    weeklyView->setCurrentZoomDepth (30, Qxt::Minute);
-    weeklyView->setDateRange(QDate(2010,9,2), QDate(2010,9,8));
-    weeklyView->setModel(weeklyViewProxy);
-
-    RideSummaryWindow *rideSummary = new RideSummaryWindow(mainWindow);
     allViews = new QStackedWidget(this);
     allViews->addWidget(monthlyView);
-    allViews->addWidget(weeklyView);
-    allViews->addWidget(rideSummary);
     //allViews->setCurrentIndex(viewMode->currentIndex());
     allViews->setCurrentIndex(0);
 
@@ -108,7 +83,6 @@ DiaryWindow::DiaryWindow(MainWindow *mainWindow) :
     connect(this, SIGNAL(rideItemChanged(RideItem*)), this, SLOT(rideSelected()));
     //connect(mainWindow, SIGNAL(rideSelected()), this, SLOT(rideSelected()));
     connect(mainWindow, SIGNAL(configChanged()), this, SLOT(configChanged()));
-    connect(weeklyView, SIGNAL(indexSelected(QModelIndex)), this, SLOT(weeklySelected(QModelIndex)));
     connect(next, SIGNAL(clicked()), this, SLOT(nextClicked()));
     connect(prev, SIGNAL(clicked()), this, SLOT(prevClicked()));
 }
@@ -143,113 +117,35 @@ DiaryWindow::rideSelected()
     QDate when = ride->dateTime.date();
     int month = when.month();
     int year = when.year();
-#if 0
-    int weekNumber = when.weekNumber();
-#endif
 
     // monthly view updates
     calendarModel->setMonth(when.month(), when.year());
 
     when = when.addDays(Qt::Monday - when.dayOfWeek());
-    weeklyView->setDateRange(when, when.addDays(6));
-    weeklyView->setViewMode(QxtScheduleView::DayView);
 
-#if 0
-    // ok update title
-    switch (viewMode->currentIndex()) {
-    case 0 : // monthly
-#endif
-        title->setText(QString("%1 %2").arg(QDate::longMonthName(month)).arg(year));
-        next->show();
-        prev->show();
-#if 0
-        break;
-    case 1 : // weekly
-        title->setText(QString("Week %1 %2").arg(weekNumber).arg(year));
-        next->show();
-        prev->show();
-        break;
-
-    default:
-    case 2 : //ride
-        title->setText("");
-        next->hide();
-        prev->hide();
-        break;
-    }
-#endif
+    title->setText(QString("%1 %2").arg(QDate::longMonthName(month)).arg(year));
+    next->show();
+    prev->show();
 }
 
 void
 DiaryWindow::prevClicked()
 {
-#if 0
-    switch (viewMode->currentIndex()) {
-    case 0 : // monthly
-        {
-#endif
-        int month = calendarModel->getMonth();
-        int year = calendarModel->getYear();
-        QDate when = QDate(year, month, 1).addDays(-1);
-        calendarModel->setMonth(when.month(), when.year());
-        title->setText(QString("%1 %2").arg(QDate::longMonthName(when.month())).arg(when.year()));
-#if 0
-        }
-        break;
-    case 1 : // weekly
-        {
-        QDateTime when = weeklyView->getStartTime();
-        when = when.addDays(-7);
-        weeklyView->setDateRange(when.date(), when.addDays(6).date());
-        weeklyView->setViewMode(QxtScheduleView::DayView);
-        title->setText(QString("Week %1 %2").arg(when.date().weekNumber()).arg(when.date().year()));
-        }
-        break;
-    }
-#endif
+    int month = calendarModel->getMonth();
+    int year = calendarModel->getYear();
+    QDate when = QDate(year, month, 1).addDays(-1);
+    calendarModel->setMonth(when.month(), when.year());
+    title->setText(QString("%1 %2").arg(QDate::longMonthName(when.month())).arg(when.year()));
 }
 
 void
 DiaryWindow::nextClicked()
 {
-#if 0
-    switch (viewMode->currentIndex()) {
-    case 0 : // monthly
-        {
-#endif
-        int month = calendarModel->getMonth();
-        int year = calendarModel->getYear();
-        QDate when = QDate(year, month, 1).addMonths(1);
-        calendarModel->setMonth(when.month(), when.year());
-        title->setText(QString("%1 %2").arg(QDate::longMonthName(when.month())).arg(when.year()));
-#if 0
-        }
-        break;
-    case 1 : // weekly
-        {
-        QDateTime when = weeklyView->getStartTime();
-        when = when.addDays(7);
-        weeklyView->setDateRange(when.date(), when.addDays(6).date());
-        weeklyView->setViewMode(QxtScheduleView::DayView);
-        title->setText(QString("Week %1 %2").arg(when.date().weekNumber()).arg(when.date().year()));
-        }
-        break;
-    }
-#endif
-}
-
-void
-DiaryWindow::weeklySelected(QModelIndex index)
-{
-    if (active) return;
-
-    // lets select it in the ride list then!
-    QString filename = weeklyViewProxy->data(index, QxtScheduleViewProxy::FilenameRole).toString();
-    active = true;
-    mainWindow->selectRideFile(QFileInfo(filename).fileName());
-    //weeklyView->setViewMode(QxtScheduleView::DayView);
-    active = false;
-    rideSelected();
+    int month = calendarModel->getMonth();
+    int year = calendarModel->getYear();
+    QDate when = QDate(year, month, 1).addMonths(1);
+    calendarModel->setMonth(when.month(), when.year());
+    title->setText(QString("%1 %2").arg(QDate::longMonthName(when.month())).arg(when.year()));
 }
 
 bool
@@ -258,8 +154,6 @@ DiaryWindow::eventFilter(QObject *object, QEvent *e)
 
     if (e->type() != QEvent::ToolTip && e->type() != QEvent::Paint && e->type() != QEvent::Destroy)
         mainWindow->setBubble("");
-
-    //if (object != (QObject *)monthlyView) return false;
 
     switch (e->type()) {
     case QEvent::MouseButtonPress:
@@ -273,11 +167,11 @@ DiaryWindow::eventFilter(QObject *object, QEvent *e)
         QRect c = monthlyView->visualRect(index);
 
         // clicked on heading
-        if (y <= (c.y()+15)) return true; // XXX clicked on heading we may need to trap this!
+        if (y <= (c.y()+15)) return true; // clicked on heading 
 
         // clicked on cell contents
         if (files.count() == 1) {
-            if (files[0] == "calendar") ; // XXX handle planned rides
+            if (files[0] == "calendar") ; // handle planned rides
             else mainWindow->selectRideFile(QFileInfo(files[0]).fileName());
 
         } else if (files.count()) {
@@ -287,11 +181,11 @@ DiaryWindow::eventFilter(QObject *object, QEvent *e)
             int i;
             for(i=files.count()-1; i>=0; i--) if (y > (c.y()+15+(h*i))) break;
 
-            if (files[i] == "calendar") ; // XXX handle planned rides
+            if (files[i] == "calendar") ; // handle planned rides
             else mainWindow->selectRideFile(QFileInfo(files[i]).fileName());
         }
 
-        // force a repaint XXX this is a hack!
+        // force a repaint 
         calendarModel->setMonth(calendarModel->getMonth(), calendarModel->getYear());
         return true;
         }
@@ -312,7 +206,7 @@ DiaryWindow::eventFilter(QObject *object, QEvent *e)
 
                 // Popup bubble for ride
                 if (files.count() == 1) {
-                    if (files[0] == "calendar") ; // XXX handle planned rides
+                    if (files[0] == "calendar") ; // handle planned rides
                     else mainWindow->setBubble(files.at(0), monthlyView->viewport()->mapToGlobal(pos));
 
                 } else if (files.count()) {
@@ -329,7 +223,7 @@ DiaryWindow::eventFilter(QObject *object, QEvent *e)
                         return true;
                     }
 
-                    if (files.at(i) == "calendar") ; // XXX handle planned rides
+                    if (files.at(i) == "calendar") ; // handle planned rides
                     else mainWindow->setBubble(files.at(i), monthlyView->viewport()->mapToGlobal(pos));
                 } else {
                     mainWindow->setBubble("");

@@ -19,7 +19,6 @@
 #include "MainWindow.h"
 #include "AboutDialog.h"
 #include "AddIntervalDialog.h"
-#include "AthleteTool.h"
 #include "BestIntervalDialog.h"
 #include "BlankState.h"
 #include "ChooseCyclistDialog.h"
@@ -52,7 +51,6 @@
 #include "Units.h"
 #include "Zones.h"
 
-#include "RideCalendar.h"
 #include "DatePickerDialog.h"
 #include "ToolsDialog.h"
 #include "ToolsRhoEstimator.h"
@@ -214,9 +212,6 @@ MainWindow::MainWindow(const QDir &home) :
     head->setContentsMargins(0,0,0,0);
 
     // widgets
-    toolBarWidgets = new QWidget(this);
-    toolBarWidgets->setContentsMargins(0,0,0,0);
-
     macAnalButtons = new QWidget(this);
     macAnalButtons->setContentsMargins(0,0,20,0);
 
@@ -225,13 +220,13 @@ MainWindow::MainWindow(const QDir &home) :
     lb->setContentsMargins(0,0,0,0);
     lb->setSpacing(0);
     import = new QtMacButton(this, QtMacButton::TexturedRounded);
-    QPixmap importImg(":images/mac/download.png");
+    QPixmap *importImg = new QPixmap(":images/mac/download.png");
     import->setImage(importImg);
     import->setToolTip("Download");
     lb->addWidget(import);
     lb->addWidget(new Spacer(this));
     compose = new QtMacButton(this, QtMacButton::TexturedRounded);
-    QPixmap composeImg(":images/mac/compose.png");
+    QPixmap *composeImg = new QPixmap(":images/mac/compose.png");
     compose->setImage(composeImg);
     compose->setToolTip("Create");
     lb->addWidget(compose);
@@ -252,11 +247,12 @@ MainWindow::MainWindow(const QDir &home) :
     QtMacSegmentedButton *actbuttons = new QtMacSegmentedButton(3, acts);
     actbuttons->setWidth(115);
     actbuttons->setNoSelect();
-    actbuttons->setImage(0, QPixmap(":images/mac/stop.png"));
-    actbuttons->setImage(1, QPixmap(":images/mac/split.png"));
-    actbuttons->setImage(2, QPixmap(":images/mac/trash.png"));
+    actbuttons->setImage(0, new QPixmap(":images/mac/stop.png"));
+    actbuttons->setImage(1, new QPixmap(":images/mac/split.png"));
+    actbuttons->setImage(2, new QPixmap(":images/mac/trash.png"));
     pp->addWidget(actbuttons);
     lb->addWidget(acts);
+    lb->addStretch();
     connect(actbuttons, SIGNAL(clicked(int,bool)), this, SLOT(actionClicked(int)));
 
     lb->addWidget(new Spacer(this));
@@ -268,19 +264,14 @@ MainWindow::MainWindow(const QDir &home) :
     pq->setSpacing(0);
     styleSelector = new QtMacSegmentedButton(2, viewsel);
     styleSelector->setWidth(80); // actually its 80 but we want a 30px space between is and the searchbox
-    styleSelector->setImage(0, QPixmap(":images/mac/tabbed.png"), 24);
-    styleSelector->setImage(1, QPixmap(":images/mac/tiled.png"), 24);
+    styleSelector->setImage(0, new QPixmap(":images/mac/tabbed.png"), 24);
+    styleSelector->setImage(1, new QPixmap(":images/mac/tiled.png"), 24);
     pq->addWidget(styleSelector);
     connect(styleSelector, SIGNAL(clicked(int,bool)), this, SLOT(toggleStyle()));
 
     // setup Mac thetoolbar
-    toolBarWidgets->setContentsMargins(0,0,0,0);
-    QHBoxLayout *l = new QHBoxLayout(toolBarWidgets);
-    l->setSpacing(0);
-    l->setContentsMargins(0,0,0,0);
     head->addWidget(macAnalButtons);
     head->addWidget(new Spacer(this));
-    head->addWidget(toolBarWidgets);
     head->addWidget(new Spacer(this));
     head->addWidget(viewsel);
 
@@ -671,11 +662,10 @@ MainWindow::MainWindow(const QDir &home) :
     QTreeWidgetItem *last = NULL;
     QStringListIterator i(RideFileFactory::instance().listRideFiles(home));
     while (i.hasNext()) {
-        QString name = i.next(), notesFileName;
+        QString name = i.next();
         QDateTime dt;
-        if (parseRideFileName(name, &notesFileName, &dt)) {
-            last = new RideItem(RIDE_TYPE, home.path(),
-                                name, dt, zones(), hrZones(), notesFileName, this);
+        if (parseRideFileName(name, &dt)) {
+            last = new RideItem(RIDE_TYPE, home.path(), name, dt, zones(), hrZones(), this);
             allRides->addChild(last);
         }
     }
@@ -900,8 +890,8 @@ MainWindow::MainWindow(const QDir &home) :
 #ifdef GC_HAVE_ICAL
     optionsMenu->addSeparator();
     optionsMenu->addAction(tr("Upload Activity to Calendar"), this, SLOT(uploadCalendar()), tr (""));
-    optionsMenu->addAction(tr("Import Calendar..."), this, SLOT(importCalendar()), tr (""));
-    optionsMenu->addAction(tr("Export Calendar..."), this, SLOT(exportCalendar()), tr (""));
+    //optionsMenu->addAction(tr("Import Calendar..."), this, SLOT(importCalendar()), tr ("")); // planned for v3.1
+    //optionsMenu->addAction(tr("Export Calendar..."), this, SLOT(exportCalendar()), tr ("")); // planned for v3.1
     optionsMenu->addAction(tr("Refresh Calendar"), this, SLOT(refreshCalendar()), tr (""));
 #endif
     optionsMenu->addSeparator();
@@ -978,9 +968,6 @@ MainWindow::MainWindow(const QDir &home) :
     // selects the latest ride in the list:
     if (allRides->childCount() != 0)
         treeWidget->setCurrentItem(allRides->child(allRides->childCount()-1));
-
-    // default to Analysis
-    selectAnalysis();
 
     // now we're up and runnning lets connect the signals
     connect(treeWidget, SIGNAL(itemSelectionChanged()), this, SLOT(rideTreeWidgetSelectionChanged()));
@@ -1294,7 +1281,7 @@ MainWindow::showTreeContextMenuPopup(const QPoint &pos)
         connect(actDeleteRide, SIGNAL(triggered(void)), this, SLOT(deleteRide()));
 
         QAction *actBestInt = new QAction(tr("Find Best Intervals"), treeWidget);
-        connect(actBestInt, SIGNAL(triggered(void)), this, SLOT(findBestIntervals()));
+        connect(actBestInt, SIGNAL(triggered(void)), this, SLOT(addIntervals()));
 
         QAction *actPowerPeaks = new QAction(tr("Find Power Peaks"), treeWidget);
         connect(actPowerPeaks, SIGNAL(triggered(void)), this, SLOT(findPowerPeaks()));
@@ -1820,13 +1807,12 @@ MainWindow::dropEvent(QDropEvent *event)
 void
 MainWindow::addRide(QString name, bool /* bSelect =true*/)
 {
-    QString notesFileName;
     QDateTime dt;
-    if (!parseRideFileName(name, &notesFileName, &dt)) {
+    if (!parseRideFileName(name, &dt)) {
         fprintf(stderr, "bad name: %s\n", name.toAscii().constData());
         assert(false);
     }
-    RideItem *last = new RideItem(RIDE_TYPE, home.path(), name, dt, zones(), hrZones(), notesFileName, this);
+    RideItem *last = new RideItem(RIDE_TYPE, home.path(), name, dt, zones(), hrZones(), this);
 
     int index = 0;
     while (index < allRides->childCount()) {
@@ -1918,9 +1904,6 @@ MainWindow::removeCurrentRide()
         ride = NULL;
         rideTreeWidgetSelectionChanged(); // notifies children
     }
-
-    // added djconnel: remove old cpi file, then update bests which are associated with the file
-    //XXX need to clean up in metricaggregator criticalPowerWindow->deleteCpiFile(strOldFileName);
 
     treeWidget->setCurrentItem(itemToSelect);
     rideTreeWidgetSelectionChanged();
@@ -2058,8 +2041,13 @@ MainWindow::revertRide()
 void
 MainWindow::splitRide()
 {
-    if (ride) (new SplitActivityWizard(this))->exec();
-    else QMessageBox::critical(this, tr("Split Activity"), tr("No activity selected!"));
+    if (ride && ride->ride() && ride->ride()->dataPoints().count()) (new SplitActivityWizard(this))->exec();
+    else {
+        if (!ride || !ride->ride())
+            QMessageBox::critical(this, tr("Split Activity"), tr("No activity selected"));
+        else
+            QMessageBox::critical(this, tr("Split Activity"), tr("Current activity contains no data to split"));
+    }
 }
 
 void
@@ -2288,19 +2276,21 @@ MainWindow::downloadTP()
  *--------------------------------------------------------------------*/
 
 void
-MainWindow::findBestIntervals()
-{
-    BestIntervalDialog *p = new BestIntervalDialog(this);
-    p->setWindowModality(Qt::ApplicationModal); // don't allow select other ride or it all goes wrong!
-    p->exec();
-}
-
-void
 MainWindow::addIntervals()
 {
-    AddIntervalDialog *p = new AddIntervalDialog(this);
-    p->setWindowModality(Qt::ApplicationModal); // don't allow select other ride or it all goes wrong!
-    p->exec();
+    if (ride && ride->ride() && ride->ride()->dataPoints().count()) {
+
+        AddIntervalDialog *p = new AddIntervalDialog(this);
+        p->setWindowModality(Qt::ApplicationModal); // don't allow select other ride or it all goes wrong!
+        p->exec();
+
+    } else {
+
+        if (!ride || !ride->ride())
+            QMessageBox::critical(this, tr("Find Best Intervals"), tr("No activity selected"));
+        else
+            QMessageBox::critical(this, tr("Find Best Intervals"), tr("Current activity contains no data"));
+    }
 }
 
 void
@@ -2331,20 +2321,29 @@ MainWindow::findPowerPeaks()
         return;
     }
 
-    addIntervalForPowerPeaksForSecs(ride->ride(), 5, "Peak 5s");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 10, "Peak 10s");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 20, "Peak 20s");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 30, "Peak 30s");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 60, "Peak 1min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 120, "Peak 2min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 300, "Peak 5min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 600, "Peak 10min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 1200, "Peak 20min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 1800, "Peak 30min");
-    addIntervalForPowerPeaksForSecs(ride->ride(), 3600, "Peak 60min");
+    if (ride && ride->ride() && ride->ride()->dataPoints().count()) {
 
-    // now update the RideFileIntervals
-    updateRideFileIntervals();
+        addIntervalForPowerPeaksForSecs(ride->ride(), 5, "Peak 5s");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 10, "Peak 10s");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 20, "Peak 20s");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 30, "Peak 30s");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 60, "Peak 1min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 120, "Peak 2min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 300, "Peak 5min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 600, "Peak 10min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 1200, "Peak 20min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 1800, "Peak 30min");
+        addIntervalForPowerPeaksForSecs(ride->ride(), 3600, "Peak 60min");
+
+        // now update the RideFileIntervals
+        updateRideFileIntervals();
+
+    } else {
+        if (!ride || !ride->ride())
+            QMessageBox::critical(this, tr("Find Power Peaks"), tr("No activity selected"));
+        else
+            QMessageBox::critical(this, tr("Find Power Peaks"), tr("Current activity contains no data"));
+    }
 }
 
 void
@@ -2490,7 +2489,7 @@ MainWindow::setCriticalPower(int cp)
 }
 
 bool
-MainWindow::parseRideFileName(const QString &name, QString *notesFileName, QDateTime *dt)
+MainWindow::parseRideFileName(const QString &name, QDateTime *dt)
 {
     static char rideFileRegExp[] = "^((\\d\\d\\d\\d)_(\\d\\d)_(\\d\\d)"
                                    "_(\\d\\d)_(\\d\\d)_(\\d\\d))\\.(.+)$";
@@ -2508,7 +2507,6 @@ MainWindow::parseRideFileName(const QString &name, QString *notesFileName, QDate
 	return false;
     }
     *dt = QDateTime(date, time);
-    *notesFileName = rx.cap(1) + ".notes";
     return true;
 }
 

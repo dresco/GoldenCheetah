@@ -73,7 +73,7 @@ public:
         WFAPI_HWCONN_STATE_ACTIVE                       = 0x02,
         WFAPI_HWCONN_STATE_RESET                        = 0x04,
         WFAPI_HWCONN_STATE_BT40_ENABLED                 = 0x08,
-        WFAPI_HWCONN_STATE_BT_BONDING_MODE              = 0x10 };
+        WFAPI_HWCONN_STATE_BT_BONDING_MODE              = 0x10 } _state;
     int currentState();
 
     // connection state
@@ -82,7 +82,7 @@ public:
         WF_SENSOR_CONNECTION_STATUS_CONNECTING = 1,
         WF_SENSOR_CONNECTION_STATUS_CONNECTED = 2,
         WF_SENSOR_CONNECTION_STATUS_INTERRUPTED = 3,
-        WF_SENSOR_CONNECTION_STATUS_DISCONNECTING = 4 };
+        WF_SENSOR_CONNECTION_STATUS_DISCONNECTING = 4 } _connstate;
     int connectionStatus(int sd);
     bool isConnected(int sd);
 
@@ -107,13 +107,36 @@ public:
         WF_SENSORTYPE_BLOOD_PRESSURE                 = 0x00008000,
         WF_SENSORTYPE_BTLE_GLUCOSE                   = 0x00010000,
         WF_SENSORTYPE_GLUCOSE                        = 0x00020000,
-        WF_SENSORTYPE_DISPLAY                        = 0x00800000  };
+        WF_SENSORTYPE_DISPLAY                        = 0x00800000  } _sensortypes; // rflkt
 
-    const QString sensorDescription(int id) const {
+    const QString sensorDescription(int id, int sub) const {
         QString returning(tr("Unknown"));
         switch (id) {
         case 0x0 : returning = tr("None"); break;
-        case 0x1 : returning = tr("Power Meter"); break;
+        case 0x1 : 
+            {
+                switch(sub) {
+
+                    case  0:
+                    default:
+                        returning = tr("Power Meter");
+                        break;
+
+                    case 1:
+                        returning = tr("Wahoo KICKR trainer");
+                        break;
+
+                    case 2:
+                        returning = tr("Stage ONE Crank Power Meter");
+                        break;
+
+                    case 3:
+                        returning = tr("Kurt Kinetic InRide Power Meter");
+                        break;
+                }
+            }
+            break;
+
         case 0x2 : returning = tr("Bike Speed"); break;
         case 0x4 : returning = tr("Bike Cadence"); break;
         case 0x8 : returning = tr("Speed and Cadence"); break;
@@ -130,7 +153,7 @@ public:
         WF_SENSOR_SUBTYPE_UNSPECIFIED                = 0,
         WF_SENSOR_SUBTYPE_BIKE_POWER_KICKR           = 1,
         WF_SENSOR_SUBTYPE_BIKE_POWER_STAGE_ONE       = 2,
-        WF_SENSOR_SUBTYPE_BIKE_POWER_IN_RIDE         = 3 };
+        WF_SENSOR_SUBTYPE_BIKE_POWER_IN_RIDE         = 3 } _sensorsubtype;
 
     // scan
     bool discoverDevicesOfType(int eSensorType);

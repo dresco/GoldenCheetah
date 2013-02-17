@@ -390,20 +390,20 @@ AnomalyDialog::check()
         double max = appsettings->value(this, GC_DPFS_MAX, "1500").toDouble();
         double variance = appsettings->value(this, GC_DPFS_VARIANCE, "1000").toDouble();
 
-        LTMOutliers *outliers = new LTMOutliers(secs.data(), power.data(), power.count(), 30, false);
+        LTMOutliers outliers(secs.data(), power.data(), power.count(), 30, false);
 
         // run through the ranked list
         for (int i=0; i<secs.count(); i++) {
 
             // is this over variance threshold?
-            if (outliers->getDeviationForRank(i) < variance) break;
+            if (outliers.getDeviationForRank(i) < variance) break;
 
             // ok, so its highly variant but is it over
             // the max value we are willing to accept?
-            if (outliers->getYForRank(i) < max) continue;
+            if (outliers.getYForRank(i) < max) continue;
 
             // which one is it
-            rideEditor->data->anomalies.insert(xsstring(outliers->getIndexForRank(i), RideFile::watts), tr("Data spike candidate"));
+            rideEditor->data->anomalies.insert(xsstring(outliers.getIndexForRank(i), RideFile::watts), tr("Data spike candidate"));
         }
     }
 
@@ -430,6 +430,10 @@ AnomalyDialog::check()
 
         counter++;
     }
+
+    // enable the toolbar / disable for anomalies found
+    if (counter) rideEditor->checkAct->setEnabled(true);
+    else rideEditor->checkAct->setEnabled(false);
 
     // redraw - even if no anomalies were found since
     // some may have been highlighted previouslt. This is
@@ -1140,10 +1144,6 @@ RideEditor::rideSelected()
     RideItem *current = myRideItem;
     if (!current || !current->ride() || !current->ride()->dataPoints().count()) {
         model->setRide(NULL);
-        if (data) {
-            delete data;
-            data = NULL;
-        }
         setIsBlank(true);
         findTool->rideSelected();
         return;
@@ -1257,8 +1257,8 @@ RideEditor::endCommand(bool undo, RideCommand *cmd)
 
             // move cursor to point updated
             QModelIndex cursor = model->index(spv->row, model->columnFor(spv->series));
-            // NOTE: This is to circumvent a performance issue with multiple
-            //       calls to setCurrentIndex XXX still TODO...
+            // NOTE: This is to circumvent a performance issue with multiple calls to setCurrentIndex 
+
             if (inLUW) { // remember and do it at the end -- otherwise major performance impact!!
                 itemselection << cursor;
             } else {
@@ -1986,11 +1986,6 @@ PasteSpecialDialog::PasteSpecialDialog(RideEditor *rideEditor, QWidget *parent) 
     contentsLayout->addWidget(resultsTable);
     contents->setLayout(contentsLayout);
     contents->setFlat(false);
-
-#if 0
-        QDoubleSpinBox *atRow;
-        QComboBox *textDelimeter;
-#endif
 
     okButton = new QPushButton(tr("OK"));
     cancelButton = new QPushButton(tr("Cancel"));

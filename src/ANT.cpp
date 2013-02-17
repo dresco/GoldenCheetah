@@ -57,18 +57,6 @@ const ant_sensor_type_t ANT::ant_sensor_types[] = {
                 ANT_SPORT_FREQUENCY, ANT_SPORT_NETWORK_NUMBER, "Cadence", 'c', ":images/IconCadence.png" },
   { ANTChannel::CHANNEL_TYPE_SandC, ANT_SPORT_SandC_PERIOD, ANT_SPORT_SandC_TYPE,
                 ANT_SPORT_FREQUENCY, ANT_SPORT_NETWORK_NUMBER, "Speed + Cadence", 'd', ":images/IconCadence.png" },
-
-  // We comment out these Quarq specials -- they appear to be experimental 
-  //                                        but kept in the code incase they re-appear :)
-#if 0
-  { ANTChannel::CHANNEL_TYPE_QUARQ, ANT_QUARQ_PERIOD, ANT_QUARQ_TYPE,
-                ANT_QUARQ_FREQUENCY, DEFAULT_NETWORK_NUMBER, "Quarq Channel", 'Q', ":images/IconPower.png" },
-  { ANTChannel::CHANNEL_TYPE_FAST_QUARQ, ANT_FAST_QUARQ_PERIOD, ANT_FAST_QUARQ_TYPE,
-                ANT_FAST_QUARQ_FREQUENCY, DEFAULT_NETWORK_NUMBER, "Fast Quarq", 'q', ":images/IconPower.png" },
-  { ANTChannel::CHANNEL_TYPE_FAST_QUARQ_NEW, ANT_FAST_QUARQ_PERIOD, ANT_FAST_QUARQ_TYPE_WAS,
-                ANT_FAST_QUARQ_FREQUENCY, DEFAULT_NETWORK_NUMBER, "Fast Quarq New", 'n', ":images/IconPower.png" },
-#endif
-
   { ANTChannel::CHANNEL_TYPE_GUARD, 0, 0, 0, 0, "", '\0', "" }
 };
 
@@ -361,7 +349,6 @@ ANT::addDevice(int device_number, int device_type, int channel_number)
             if (((antChannel[i]->channel_type & 0xf ) == device_type) &&
                 (antChannel[i]->device_number == device_number)) {
                 // send the channel found...
-                //XXX antChannel[i]->channelInfo();
                 return 1;
             }
         }
@@ -460,14 +447,6 @@ ANT::startWaitingSearch()
 }
 
 void
-ANT::report()
-{
-    for (int i=0; i<channels; i++)
-        //XXX antChannel[i]->channelInfo();
-        ;
-}
-
-void
 ANT::associateControlChannels() {
 
     // first, unassociate all control channels
@@ -525,13 +504,17 @@ ANT::associateControlChannels() {
 bool
 ANT::discover(QString name)
 {
+#ifdef WIN32
+Q_UNUSED(name);
+#endif
+
 #ifdef Q_OS_LINUX
 
     // All we can do for USB1 sticks is see if the cp210x driver module
     // is loaded for this device, and if it is, we will use the device
-    // XXX need a better way of probing this device, but USB1 sticks
-    //     are getting rarer, so maybe we can just make do with this
-    //     until we deprecate them altogether
+    // they are getting rarer and rarer these days (no longer sold by
+    // Garmin anyway) so no need to expend to much energy extending this
+    // especially since the Linux user community is relatively small.
     struct stat s;
     if (stat(name.toLatin1(), &s) == -1) return false;
     int maj = major(s.st_rdev);
@@ -613,7 +596,8 @@ ANT::sendMessage(ANTMessage m) {
 
     rawWrite((uint8_t*)m.data, m.length);
 
-    // this padding is important, for some reason XXX find out why?
+    // this padding is important - do not remove it
+    // we need to be sure the message is at least 12 bytes
     rawWrite((uint8_t*)padding, 5);
 }
 
@@ -704,7 +688,6 @@ ANT::processMessage(void) {
         case ANT_CHANNEL_EVENT:
           switch (rxMessage[ANT_OFFSET_MESSAGE_CODE]) {
           case EVENT_TRANSFER_TX_FAILED:
-            //XXX remember last message ... ANT_SendAckMessage();
             break;
           case EVENT_TRANSFER_TX_COMPLETED:
             // fall through
@@ -897,8 +880,6 @@ int ANT::rawWrite(uint8_t *bytes, int size) // unix!!
 
 int ANT::rawRead(uint8_t bytes[], int size)
 {
-    int rc=0;
-
 #ifdef WIN32
     switch (usbMode) {
     case USB1:
@@ -908,7 +889,6 @@ int ANT::rawRead(uint8_t bytes[], int size)
         return usb2->read((char *)bytes, size);
         break;
     default:
-        rc = 0;
         break;
     }
 
@@ -925,13 +905,14 @@ int ANT::rawRead(uint8_t bytes[], int size)
     // read one byte at a time sleeping when no data ready
     // until we timeout waiting then return error
     for (i=0; i<size; i++) {
-        rc = read(devicePort, &byte, 1);
+        int rc = read(devicePort, &byte, 1);
         if (rc == -1 || rc == 0) return -1; // error!
         else bytes[i] = byte;
     }
     return i;
 
 #endif
+    return -1; // keep compiler happy.
 }
 
 // convert 'p' 'c' etc into ANT values for device type
@@ -946,7 +927,7 @@ int ANT::interpretSuffix(char c)
     return -1;
 }
 
-// convert ANT value to 'p' 'c' values // XXX this and below are named wrong, legacy from quarqd code.
+// convert ANT value to 'p' 'c' values
 char ANT::deviceIdCode(int type)
 {
     const ant_sensor_type_t *st=ant_sensor_types;

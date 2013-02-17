@@ -197,7 +197,7 @@ RideImportWizard::init(QList<QString> files, QDir &home, MainWindow * /*mainWind
     // on Leopard, no doubt not so good on Windows
     resize(920 +
            ((files.count() > 16 ? 24 : 0) +
-           (files.count() > 9 && files.count() < 17) ? 8 : 0),
+           ((files.count() > 9 && files.count() < 17) ? 8 : 0)),
            118 + (files.count() > 16 ? 17*20 : (files.count()+1) * 20));
 
     tableWidget->adjustSize();
@@ -294,8 +294,8 @@ RideImportWizard::process()
                  // resize dialog according to the number of rows we expect
                  int willhave = filenames.count() + rides.count();
                  resize(920 + ((willhave > 16 ? 24 : 0) +
-                     (willhave > 9 && willhave < 17) ? 8 : 0),
-                     118 + (willhave > 16 ? 17*20 : (willhave+1) * 20));
+                     ((willhave > 9 && willhave < 17) ? 8 : 0)),
+                     118 + ((willhave > 16 ? 17*20 : (willhave+1) * 20)));
 
 
                  // ok so create a temporary file and add to the tableWidget
@@ -885,35 +885,6 @@ RideImportWizard::abortClicked()
         progressBar->setValue(progressBar->value()+1);
         this->repaint();
     }
-
-#if 0 // NOT UNTIL CPINTPLOT.CPP IS REFACTORED TO SEPERATE CPI FILES MAINTENANCE FROM CP PLOT CODE
-    // if done when labelled save we copy the files and run the cpi calculator
-    phaseLabel->setText(tr("Step 5 of 5: Calculating Critical Powers"));
-
-   abortButton->setText(tr("Abort"));
-   aborted = false;
-
-    for (int i=0; i< filenames.count(); i++) {
-
-        if (!tableWidget->item(i,5)->text().startsWith(tr("Error"))) {
-            tableWidget->item(i,5)->setText(tr("Calculating..."));
-            tableWidget->setCurrentCell(i,5);
-            QApplication::processEvents();
-            if (aborted) { done(0); }
-            this->repaint();
-
-            // calculated
-
-            // change status
-            tableWidget->item(i,5)->setText(tr("Completed."));
-        }
-        QApplication::processEvents();
-        if (aborted) { done(0); }
-        progressBar->setValue(progressBar->value()+1);
-        this->repaint();
-    }
-#endif // not until CPINTPLOT IS REFACTORED
-
 
     // how did we get on in the end then ...
     int completed = 0;

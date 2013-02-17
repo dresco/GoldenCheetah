@@ -225,15 +225,6 @@ void DataFilter::configUpdate()
                 lookupType.insert(underscored.replace(" ","_"), (field.type > 2)); // true if is number
             }
     }
-
-#if 0
-    QMapIterator<QString, QString>r(lookupMap);
-    while(r.hasNext()) {
-
-        r.next();
-        qDebug()<<"Lookup"<<r.key()<<"to get"<<r.value();
-    }
-#endif
 }
 
 bool Leaf::eval(DataFilter *df, Leaf *leaf, SummaryMetrics m)
@@ -254,9 +245,9 @@ bool Leaf::eval(DataFilter *df, Leaf *leaf, SummaryMetrics m)
 
     case Leaf::Operation : 
     {
-        double lhsdouble, rhsdouble;
+        double lhsdouble=0.00, rhsdouble=0.00;
         QString lhsstring, rhsstring;
-        bool lhsisNumber, rhsisNumber;
+        bool lhsisNumber=false, rhsisNumber=false;
 
         // GET LHS VALUE
         switch (leaf->lvalue.l->type) {

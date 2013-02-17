@@ -101,7 +101,15 @@ public slots:
 
         // we need to build a list of all the rides
         // in the source model for the dates we have
-        dateToRows.clear(); //XXX mem leak, need to delete vectors...
+        // first we clear previous
+        QMapIterator<QDate, QVector<int>* > fm(dateToRows);
+        while (fm.hasNext()) {
+            fm.next();
+            delete fm.value();
+        }
+        dateToRows.clear();
+
+        // then we create new
         for (int j=0; j<sourceModel()->rowCount(); j++) {
             QVector<int> *arr;
 
@@ -208,13 +216,16 @@ public:
             {
             QList<QColor> colors;
             QVector<int> *arr = dateToRows.value(date(proxyIndex), NULL);
-            if (arr)
-                foreach (int i, *arr)
-                    if (mainWindow->rideItem() && sourceModel()->data(index(i, dateIndex, QModelIndex())).toDateTime() == mainWindow->rideItem()->dateTime)
+            if (arr) {
+                foreach (int i, *arr) {
+                    if (mainWindow->rideItem() && sourceModel()->data(index(i, dateIndex, QModelIndex())).toDateTime() == mainWindow->rideItem()->dateTime) {
                         colors << GColor(CCALCURRENT); // its the current ride!
-                    else
-
+                    } else {
                         colors << QColor(sourceModel()->data(index(i, colorIndex, QModelIndex())).toString());
+                    }
+                }
+            }
+
 #ifdef GC_HAVE_ICAL
             // added planned workouts
             for (int k= mainWindow->rideCalendar->data(date(proxyIndex), EventCountRole).toInt(); k>0; k--)

@@ -21,6 +21,7 @@
 #include "GoldenCheetah.h"
 
 #include "MainWindow.h"
+#include "GcSideBarItem.h"
 #include "Season.h"
 #include "RideMetric.h"
 #include "LTMSettings.h"
@@ -66,14 +67,15 @@ class LTMSidebar : public QWidget
         // date range selection and editing
         void dateRangeTreeWidgetSelectionChanged();
         void dateRangePopup(QPoint);
+        void dateRangePopup();
         void dateRangeChanged(QTreeWidgetItem *, int);
         void dateRangeMoved(QTreeWidgetItem *, int, int);
         void addRange();
-        void renameRange();
         void editRange();
         void deleteRange();
 
         void eventPopup(QPoint);
+        void eventPopup();
         void editEvent();
         void deleteEvent();
         void addEvent();
@@ -93,11 +95,14 @@ class LTMSidebar : public QWidget
         bool active;
         QDate from, to; // so we don't repeat update...
 
+
         Seasons *seasons;
+        GcSideBarItem *seasonsWidget;
         SeasonTreeView *dateRangeTree;
         QTreeWidgetItem *allDateRanges;
         QTreeWidgetItem *activeDateRange; // when using context menus
 
+        GcSideBarItem *eventsWidget;
         QTreeWidget *eventTree;
         QTreeWidgetItem *allEvents;
         QTreeWidgetItem *activeEvent; // when using context menus

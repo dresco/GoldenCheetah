@@ -22,7 +22,7 @@
 #include <QWidget>
 #include <QVBoxLayout>
 #include <QPointer>
-#include <QMacCocoaViewContainer>>
+#include <QMacCocoaViewContainer>
 
 
 // Qocoa already dit this, so re-used their code, saved a bit of effort!
@@ -55,7 +55,7 @@ public:
 public slots:
     void setText(const QString &text);
     void setToolTip(const QString &text);
-    void setImage(const QPixmap &image);
+    void setImage(const QPixmap *image);
     void setChecked(bool checked);
     void setWidth(int x);
     void setIconAndText();
