@@ -86,7 +86,6 @@ class LTMSidebar : public QWidget
 
         // gui components
         void setSummary(DateRange);
-        void splitterMoved(int, int);
 
     private:
 
@@ -97,19 +96,17 @@ class LTMSidebar : public QWidget
 
 
         Seasons *seasons;
-        GcSideBarItem *seasonsWidget;
+        GcSplitterItem *seasonsWidget;
         SeasonTreeView *dateRangeTree;
         QTreeWidgetItem *allDateRanges;
-        QTreeWidgetItem *activeDateRange; // when using context menus
 
-        GcSideBarItem *eventsWidget;
+        GcSplitterItem *eventsWidget;
         QTreeWidget *eventTree;
         QTreeWidgetItem *allEvents;
-        QTreeWidgetItem *activeEvent; // when using context menus
 
         QWebView *summary;
 
-        QSplitter *splitter;
+        GcSplitter *splitter;
 };
 
 #endif // _GC_LTMSidebar_h

@@ -39,6 +39,7 @@ class SearchFilterBox;
 class DiaryWindow;
 class BUGFIXQSortFilterProxyModel;
 class DataFilter;
+class GcMiniCalendar;
 
 //
 // The RideNavigator
@@ -62,6 +63,7 @@ class RideNavigator : public GcWindow
     friend class ::GroupByModel;
     friend class ::DiaryWindow;
     friend class ::GcCalendar;
+    friend class ::GcMiniCalendar;
     friend class ::DataFilter;
 
     public:
@@ -119,6 +121,12 @@ class RideNavigator : public GcWindow
  
         QString columns() const { return _columns; }
         void setColumns(QString x) { _columns = x; }
+
+        // These are used in the main sidebar to let the users
+        // add remove columns etc without using right click
+        QStringList columnNames() const;
+        void setGroupByColumnName(QString); // set blank turns it off
+        void noGroups() { currentColumn=-1; setGroupByColumn(); }
 
         QString widths() const { return _widths; }
         void setWidths (QString x) { _widths = x; resetView(); } // only reset once widths are set

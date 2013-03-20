@@ -29,11 +29,7 @@
 #define GC_SETTINGS_MAIN_X          "mainwindow/x"
 #define GC_SETTINGS_MAIN_Y          "mainwindow/y"
 #define GC_SETTINGS_MAIN_GEOM       "mainwindow/geometry"
-#define GC_SETTINGS_CALSPLITTER_SIZES  "mainwindow/calsplitterSizes"
-#define GC_SETTINGS_LTMSPLITTER_SIZES  "mainwindow/ltmsplitterSizes"
-#define GC_SETTINGS_INTERVALSPLITTER_SIZES  "mainwindow/intervalsplitterSizes"
 #define GC_SETTINGS_SPLITTER_SIZES  "mainwindow/splitterSizes"
-#define GC_SETTINGS_SUMMARYSPLITTER_SIZES "mainwindow/summarysplittersizes"
 #define GC_SETTINGS_CALENDAR_SIZES  "mainwindow/calendarSizes"
 #define GC_TABS_TO_HIDE             "mainwindow/tabsToHide"
 #define GC_ELEVATION_HYSTERESIS     "elevationHysteresis"
@@ -78,6 +74,7 @@
 #define GC_WORKOUTDIR      "workoutDir"
 #define GC_TRAIN_SPLITTER_SIZES  "trainwindow/splitterSizes"
 #define GC_LTM_SPLITTER_SIZES  "ltmwindow/splitterSizes"
+#define GC_LTM_LAST_DATE_RANGE "ltmwindow/lastDateRange"
 #define GC_BLANK_ANALYSIS "blank/analysis"
 #define GC_BLANK_TRAIN    "blank/train"
 #define GC_BLANK_HOME     "blank/home"
@@ -220,5 +217,6 @@ extern int OperatingSystem;
 #define WINDOWS 1
 #define LINUX   2
 #define OSX     3
+#define OPENBSD 4
 
 #endif // _GC_Settings_h

@@ -21,13 +21,13 @@
 #include "GoldenCheetah.h"
 
 #include "MainWindow.h"
-#include "GoldenClient.h"
 #include "RealtimeData.h"
 #include "RealtimePlot.h"
 #include "DeviceConfiguration.h"
 #include "DeviceTypes.h"
 #include "ErgFile.h"
 #include "ErgFilePlot.h"
+#include "GcSideBarItem.h"
 
 // standard stuff
 #include <QDir>
@@ -80,22 +80,15 @@ class TrainTool : public GcWindow
         QStringList listWorkoutFiles(const QDir &) const;
 
         QList<int> devices(); // convenience function for iterating over active devices
-        GoldenClient       *streamController;   // send out to
 
         const QTreeWidgetItem *currentWorkout() { return workout; }
         const QTreeWidgetItem *currentMedia() { return media; }
         const QTreeWidgetItem *workoutItems() { return allWorkouts; }
-        const QTreeWidgetItem *currentServer() { return server; }
-        const QTreeWidgetItem *serverItems() { return allServers; }
 
         int selectedDeviceNumber();
-        int selectedServerNumber();
 
         // set labels when ergfile selected etc
         void setLabels();
-
-        // notify widgets of race update
-        void notifyRaceStandings(RaceStatus x) { raceStandings(x); }
 
         // was realtimewindow,merged into tool
         // update charts/dials and manage controller
@@ -118,20 +111,21 @@ class TrainTool : public GcWindow
     signals:
 
         void deviceSelected();
-        void serverSelected();
-        void raceStandings(RaceStatus);
         void start();
         void pause();
         void stop();
 
     private slots:
-        void serverTreeWidgetSelectionChanged();
         void deviceTreeWidgetSelectionChanged();
         void workoutTreeWidgetSelectionChanged();
         void mediaTreeWidgetSelectionChanged();
 
         void deviceTreeMenuPopup(const QPoint &);
         void deleteDevice();
+
+        void devicePopup();
+        void workoutPopup();
+        void mediaPopup();
 
         void refresh(); // when TrainDB is updated...
 
@@ -140,6 +134,8 @@ class TrainTool : public GcWindow
 
     public slots:
         void configChanged();
+        void deleteWorkouts(); // deletes selected workouts
+        void deleteVideos(); // deletes selected workouts
 
         void Start();       // when start button is pressed
         void Pause();       // when Paude is pressed
@@ -157,7 +153,6 @@ class TrainTool : public GcWindow
         // Timed actions
         void guiUpdate();           // refreshes the telemetry
         void diskUpdate();          // writes to CSV file
-        void streamUpdate();        // writes to remote Peer
         void loadUpdate();          // sets Load on CT like devices
 
         // When no config has been setup
@@ -172,7 +167,10 @@ class TrainTool : public GcWindow
 
         const QDir home;
         MainWindow *main;
-        QSplitter   *trainSplitter;
+        GcSplitter   *trainSplitter;
+        GcSplitterItem *deviceItem,
+                       *workoutItem,
+                       *mediaItem;
 
         QWidget *toolbarButtons;
 
@@ -180,15 +178,11 @@ class TrainTool : public GcWindow
         QSqlTableModel *workoutModel;
 
         QTreeWidget *deviceTree;
-        QTreeWidget *serverTree;
         QTreeView *workoutTree;
         QSortFilterProxyModel *sortModel;  // sorting workout list
         QSortFilterProxyModel *vsortModel; // sorting video list
         QTreeView *mediaTree;
 
-        QTreeWidgetItem *allServers;
-        QTreeWidgetItem *allDevices;
-        QTreeWidgetItem *server;
         QTreeWidgetItem *allWorkouts;
         QTreeWidgetItem *workout;
         QTreeWidgetItem *media;
@@ -231,7 +225,6 @@ class TrainTool : public GcWindow
         QTime session_time, lap_time;
 
         QTimer      *gui_timer,     // refresh the gui
-                    *stream_timer,  // send telemetry to server
                     *load_timer,    // change the load on the device
                     *disk_timer;    // write to .CSV file
 

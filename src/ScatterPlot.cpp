@@ -18,6 +18,7 @@
 
 #include "ScatterPlot.h"
 #include "ScatterWindow.h"
+#include "IntervalItem.h"
 #include "MainWindow.h"
 #include "Settings.h"
 #include "Zones.h"
@@ -218,7 +219,7 @@ void ScatterPlot::setData (ScatterSettings *settings)
     sym.setPen(GCColor::invert(GColor(CPLOTBACKGROUND)));
     sym.setBrush(QBrush(Qt::NoBrush));
     QPen p;
-    p.setColor(Qt::gray);
+    p.setColor(GColor(CPLOTSYMBOL));
     sym.setPen(p);
 
     // wipe away existing

@@ -34,6 +34,51 @@ class IntervalItem : public QTreeWidgetItem
 
         IntervalItem(const RideFile *, QString, double, double, double, double, int);
         void setDisplaySequence(int seq) { displaySequence = seq; }
+
+        // used by qSort()
+        bool operator< (IntervalItem right) const {
+            return (start < right.start);
+        }
 };
+
+class RenameIntervalDialog : public QDialog
+{
+    Q_OBJECT
+    G_OBJECT
+
+    public:
+        RenameIntervalDialog(QString &, QWidget *);
+
+    public slots:
+        void applyClicked();
+        void cancelClicked();
+
+    private:
+        QString &string;
+        QPushButton *applyButton, *cancelButton;
+        QLineEdit *nameEdit;
+};
+
+class EditIntervalDialog : public QDialog
+{
+    Q_OBJECT
+    G_OBJECT
+
+
+    public:
+        EditIntervalDialog(QWidget *, IntervalItem &);
+
+    public slots:
+        void applyClicked();
+        void cancelClicked();
+
+    private:
+        IntervalItem &interval;
+
+        QPushButton *applyButton, *cancelButton;
+        QLineEdit *nameEdit;
+        QTimeEdit *fromEdit, *toEdit;
+};
+
 #endif // _GC_IntervalItem_h
 

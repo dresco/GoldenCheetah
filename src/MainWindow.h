@@ -26,8 +26,6 @@
 #include <QNetworkReply>
 #include <qwt_plot_curve.h>
 #include "RideItem.h"
-#include "IntervalItem.h"
-#include "IntervalTreeView.h"
 #include "GcWindowRegistry.h"
 #include "RealtimeData.h"
 #include "SpecialFields.h"
@@ -57,6 +55,7 @@ class IntervalSummaryWindow;
 class RideNavigator;
 class GcToolBar;
 class GcCalendar;
+class GcMultiCalendar;
 class GcBubble;
 class LTMSidebar;
 class LionFullScreen;
@@ -74,6 +73,11 @@ class BlankStateAnalysisPage;
 class BlankStateHomePage;
 class BlankStateDiaryPage;
 class BlankStateTrainPage;
+class GcSplitter;
+class GcSplitterItem;
+class QtSegmentControl;
+class IntervalItem;
+class IntervalTreeView;
 
 extern QList<MainWindow *> mainwindows; // keep track of all the MainWindows we have open
 extern QDesktopWidget *desktop;         // how many screens / res etc
@@ -101,6 +105,7 @@ class MainWindow : public QMainWindow
         QSqlDatabase db;
         RideNavigator *listView;
         MetricAggregator *metricDB;
+        RideMetadata *_rideMetadata;
         Seasons *seasons;
         QList<RideFileCache*> cpxCache;
 
@@ -136,7 +141,7 @@ class MainWindow : public QMainWindow
 
         // ride intervals
         const QTreeWidgetItem *allIntervalItems() { return allIntervals; }
-        QTreeWidget *intervalTreeWidget() { return intervalWidget; }
+        IntervalTreeView *intervalTreeWidget() { return intervalWidget; }
         QTreeWidgetItem *mutableIntervalItems() { return allIntervals; }
         void updateRideFileIntervals();
 
@@ -174,19 +179,37 @@ class MainWindow : public QMainWindow
 
         void setBubble(QString text, QPoint pos = QPoint(), Qt::Orientation o = Qt::Horizontal);
 
+#ifdef GC_HAVE_LUCENE
+        Lucene *lucene;
+        NamedSearches *namedSearches;
+#endif
+
+        // splitter for sidebar and main view
+        QSplitter *splitter;
+
+        // sidebar and views
+        QStackedWidget *toolBox; // contains all left sidebars
+        QStackedWidget *views;   // contains all the views
+
+        // sidebars
+        TrainTool *trainTool; // train view
+        LTMSidebar *ltmSidebar; // home view
+        GcCalendar *gcCalendar; // diary
+
+        // analysis view
+        // constructed from parts in mainwindow
+        GcSplitter *analSidebar;
+        GcSplitterItem *analItem, *intervalItem;
+        QSplitter *intervalSplitter;
+        IntervalTreeView *intervalWidget;
+        GcMultiCalendar *gcMultiCalendar;
+
 #if (defined Q_OS_MAC) && (defined GC_HAVE_LION)
         LionFullScreen *fullScreen;
 #endif
 #ifndef Q_OS_MAC
         QTFullScreen *fullScreen;
 #endif
-        TrainTool *trainTool;
-#ifdef GC_HAVE_LUCENE
-        Lucene *lucene;
-        NamedSearches *namedSearches;
-#endif
-        LTMSidebar *ltmSidebar;
-
         // *********************************************
         // APPLICATION EVENTS
         // *********************************************
@@ -218,8 +241,6 @@ class MainWindow : public QMainWindow
         void notifyPause() { emit pause(); }
         void notifyStop() { emit stop(); }
         void notifySeek(long x) { emit seek(x); }
-
-
 
     protected:
 
@@ -271,11 +292,17 @@ class MainWindow : public QMainWindow
         void closeBlankDiary();
         void closeBlankHome();
 
+        void downloadErgDB();
+        void manageLibrary();
+        void showWorkoutWizard();
+
+        void analysisPopup();
+        void intervalPopup();
+
     private slots:
         void rideTreeWidgetSelectionChanged();
         void intervalTreeWidgetSelectionChanged();
         void splitterMoved(int, int);
-        void intervalSplitterMoved(int, int);
         void newCyclist();
         void openCyclist();
         void downloadRide();
@@ -284,10 +311,9 @@ class MainWindow : public QMainWindow
         void exportBatch();
         void exportMetrics();
         void uploadStrava();
+        void downloadStrava();
         void uploadRideWithGPSAction();
         void uploadTtb();
-        void downloadErgDB();
-        void manageLibrary();
         void manualProcess(QString);
 #ifdef GC_HAVE_SOAP
         void uploadTP();
@@ -306,7 +332,6 @@ class MainWindow : public QMainWindow
         void aboutDialog();
         void saveRide();                        // save current ride menu item
         void revertRide();
-        void enableSaveButton();                // enable/disable save button when ride changes etc
         bool saveRideExitDialog();              // save dirty rides on exit dialog
         void showOptions();
         void showTools();
@@ -314,13 +339,19 @@ class MainWindow : public QMainWindow
         void toggleSidebar();
         void showSidebar(bool want);
         void showToolbar(bool want);
-        void showWorkoutWizard();
         void resetWindowLayout();
         void dateChanged(const QDate &);
         void showContextMenuPopup(const QPoint &);
-        void deleteInterval();
-        void renameInterval();
-        void zoomInterval();
+        void editInterval(); // from right click
+        void deleteInterval(); // from right click
+        void renameInterval(); // from right click
+        void zoomInterval(); // from right click
+        void sortIntervals(); // from menu popup
+        void renameIntervalSelected(void); // from menu popup
+        void renameIntervalsSelected(void); // from menu popup -- rename a series
+        void editIntervalSelected(); // from menu popup
+        void deleteIntervalSelected(void); // from menu popup
+        void zoomIntervalSelected(void); // from menu popup
         void frontInterval();
         void backInterval();
         void intervalEdited(QTreeWidgetItem *, int);
@@ -347,7 +378,6 @@ class MainWindow : public QMainWindow
         void selectDiary();
         void selectAnalysis();
         void selectTrain();
-        void selectAthlete();
 
         void setActivityMenu();
         void setWindowMenu();
@@ -359,14 +389,16 @@ class MainWindow : public QMainWindow
 
         void toggleStyle();
         void setStyle();
-        void showDock();
+        // special case for linux/win qtsegmentcontrol toggline
+        void setStyleFromSegment(int);
+
 #ifndef Q_OS_MAC
         void toggleFullScreen();
 #else
         // Mac Native Support
         void searchTextChanged(QString);
-        void actionClicked(int);
 #endif
+        void actionClicked(int);
 
         void dateRangeChangedDiary(DateRange);
         void dateRangeChangedLTM(DateRange);
@@ -374,76 +406,73 @@ class MainWindow : public QMainWindow
     protected:
 
     private:
-        QSharedPointer<QSettings> settings;
+
+        // active when right clicked
         IntervalItem *activeInterval; // currently active for context menu popup
         RideItem *activeRide; // currently active for context menu popup
+
+        // current selections
         RideItem *ride;  // the currently selected ride
         DateRange _dr;   // the currently selected date range
-
         ErgFile *workout; // the currently selected workout file
-        long now;
 
-        QStackedWidget *toolBox;
-        GcToolBar *toolbar;
-        QDockWidget *dock;
-        QAction *homeAct, *diaryAct, *analysisAct, *measuresAct, *trainAct, *athleteAct, *helpAct, *configAct;
-        QAction *styleAction;
-        QAction *showhideToolbar;
-        QAction *showhideSidebar;
-        QAction *showhideRSidebar;
+        long now; // point in time during train session
 
-        // toolbar butttons
-        QPushButton *side, *style, *full, *saveButton;
-        QWidget *analButtons;
+#ifdef Q_OS_MAC
+        // Mac Native Support
+        QtMacButton *import, *compose, *sidebar;
+        QtMacSegmentedButton *actbuttons, *styleSelector;
+        QToolBar *head;
+#else
+        // Not on Mac so use other types
+        QPushButton *import, *compose, *sidebar;
+        QtSegmentControl *actbuttons, *styleSelector;
+        GcToolBar *head;
+        QPushButton *full;
+
+        // the icons
+        QIcon importIcon, composeIcon, intervalIcon, splitIcon,
+              deleteIcon, sidebarIcon, tabbedIcon, tiledIcon;
+#endif
+        GcScopeBar *scopebar;
+
+        // chart menus
         QMenu *chartMenu;
         QMenu *subChartMenu;
 
-        QStackedWidget *views;
-        QAction *sideView;
-        QAction *toolView;
-        QAction *stravaAction, *rideWithGPSAction;
-        QAction *ttbAction;
+        // Application menu
         QMenu *windowMenu;
-        GcBubble *bubble;
-        GcCalendar *gcCalendar;
 
-        // each view has its own controls XXX more to come
+        // Application actions
+        // only keeping those used outside of mainwindow constructor
+        QAction *styleAction;
+        QAction *showhideSidebar;
+        QAction *stravaAction;
+        QAction *rideWithGPSAction;
+        QAction *ttbAction;
+
+        GcBubble *bubble;
+
+        // each view has its own controls
         QStackedWidget *masterControls,
                        *analysisControls,
                        *trainControls,
                        *diaryControls,
                        *homeControls;
 
-        // sidebar
+        // central data structure
+        QTreeWidget *treeWidget;
         QTreeWidgetItem *allRides;
         QTreeWidgetItem *allIntervals;
         IntervalSummaryWindow *intervalSummaryWindow;
-        QSplitter *leftLayout;
-        QWidget *rightBar;
-        RideMetadata *_rideMetadata;
-        GcWindowTool *chartTool;
-
-        QSplitter *summarySplitter;
-        QSplitter *splitter;
-        QSplitter *metaSplitter;
-        QTreeWidget *treeWidget;
-        QSplitter *intervalSplitter;
-        IntervalTreeView *intervalWidget;
 
         // Miscellany
+        QSignalMapper *groupByMapper;
         QSignalMapper *toolMapper;
         WithingsDownload *withingsDownload;
         ZeoDownload *zeoDownload;
         bool parseRideFileName(const QString &name, QDateTime *dt);
 
-#ifdef Q_OS_MAC
-        // Mac Native Support
-        QWidget *macAnalButtons;
-        QtMacButton *import, *compose;
-        QtMacSegmentedButton *styleSelector;
-        QToolBar *head;
-        GcScopeBar *scopebar;
-#endif
 };
 
 #endif // _GC_MainWindow_h

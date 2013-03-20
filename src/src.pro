@@ -142,7 +142,6 @@ macx {
                 QtMacButton.h \
                 QtMacPopUpButton.h \
                 QtMacSearchBox.h \
-                GcScopeBar.h
 
     OBJECTIVE_SOURCES +=    QtMacVideoWindow.mm \
                             LionFullScreen.mm \
@@ -150,8 +149,6 @@ macx {
                             QtMacButton.mm \
                             QtMacPopUpButton.mm \
                             QtMacSearchBox.mm
-
-    SOURCES +=  GcScopeBar.cpp
 
     # on a mac we need to install the Wahoo API for BTLE/Kickr support
     # This requires **v3.0 (beta)** of the WF API which is not yet
@@ -182,6 +179,9 @@ macx {
     HEADERS += QTFullScreen.h
     SOURCES += QTFullScreen.cpp
 
+    #qt segmented control for toolbar (non-Mac)
+    HEADERS += ../qtsolutions/segmentcontrol/qtsegmentcontrol.h
+    SOURCES += ../qtsolutions/segmentcontrol/qtsegmentcontrol.cpp
 }
 
 !win32 {
@@ -280,13 +280,13 @@ HEADERS += \
         GcCalendarModel.h \
         GcPane.h \
         GcRideFile.h \
+        GcScopeBar.h \
         GcSideBarItem.h \
         GcToolBar.h \
         GcWindowLayout.h \
         GcWindowRegistry.h \
         GcWindowTool.h \
         GoldenCheetah.h \
-        GoldenClient.h \
         GoogleMapControl.h \
         GpxParser.h \
         GpxRideFile.h \
@@ -333,7 +333,6 @@ HEADERS += \
         PowerTapDevice.h \
         PowerTapUtil.h \
         PwxRideFile.h \
-        ProtocolHandler.h \
         QuarqParser.h \
         QuarqRideFile.h \
         RawRideFile.h \
@@ -376,7 +375,10 @@ HEADERS += \
         SmfRideFile.h \
         SrdRideFile.h \
         SrmRideFile.h \
-        StravaDialog.h \
+        StravaDownloadDialog.h \
+        StravaParser.h \
+        StravaRideFile.h \
+        StravaUploadDialog.h \
         StressCalculator.h \
         SummaryMetrics.h \
         SummaryWindow.h \
@@ -469,13 +471,13 @@ SOURCES += \
         GcCalendar.cpp \
         GcPane.cpp \
         GcRideFile.cpp \
+        GcScopeBar.cpp \
         GcSideBarItem.cpp \
         GcToolBar.cpp \
         GcWindowLayout.cpp \
         GcWindowRegistry.cpp \
         GcWindowTool.cpp \
         GoldenCheetah.cpp \
-        GoldenClient.cpp \
         GoogleMapControl.cpp \
         GpxParser.cpp \
         GpxRideFile.cpp \
@@ -523,7 +525,6 @@ SOURCES += \
         PowerHist.cpp \
         PowerTapDevice.cpp \
         PowerTapUtil.cpp \
-        Protocolhandler.cpp \
         PwxRideFile.cpp \
         QuarqParser.cpp \
         QuarqRideFile.cpp \
@@ -566,7 +567,10 @@ SOURCES += \
         SmfRideFile.cpp \
         SrdRideFile.cpp \
         SrmRideFile.cpp \
-        StravaDialog.cpp \
+        StravaDownloadDialog.cpp \
+        StravaParser.cpp \
+        StravaRideFile.cpp \
+        StravaUploadDialog.cpp \
         StressCalculator.cpp \
         SummaryMetrics.cpp \
         SummaryWindow.cpp \

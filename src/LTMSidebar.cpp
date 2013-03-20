@@ -41,23 +41,13 @@
 
 LTMSidebar::LTMSidebar(MainWindow *parent, const QDir &home) : QWidget(parent), home(home), main(parent), active(false)
 {
-    setStyleSheet("QFrame { FrameStyle = QFrame::NoFrame };"
-                  "QWidget { background = Qt::white; border:0 px; margin: 2px; };");
-
     QVBoxLayout *mainLayout = new QVBoxLayout(this);
     mainLayout->setContentsMargins(0,0,0,0);
     mainLayout->setSpacing(0);
     setContentsMargins(0,0,0,0);
 
-    seasonsWidget = new GcSideBarItem(tr("Date Ranges"), this);
-
-    QAction *addSeasonAct = new QAction(tr("+"), this);
-    seasonsWidget->addAction(addSeasonAct);
-    connect(addSeasonAct, SIGNAL(triggered(void)), this, SLOT(addRange(void)));
-    QAction *removeSeasonAct = new QAction(tr("-"), this);
-    seasonsWidget->addAction(removeSeasonAct);
-    connect(removeSeasonAct, SIGNAL(triggered(void)), this, SLOT(deleteRange(void)));
-    QAction *moreSeasonAct = new QAction(tr(">>"), this);
+    seasonsWidget = new GcSplitterItem(tr("Date Ranges"), iconFromPNG(":images/sidebar/calendar.png"), this);
+    QAction *moreSeasonAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
     seasonsWidget->addAction(moreSeasonAct);
     connect(moreSeasonAct, SIGNAL(triggered(void)), this, SLOT(dateRangePopup(void)));
 
@@ -80,19 +70,14 @@ LTMSidebar::LTMSidebar(MainWindow *parent, const QDir &home) : QWidget(parent), 
     seasonsWidget->addWidget(dateRangeTree);
 
 
-    eventsWidget = new GcSideBarItem(tr("Events"), this);
-
-    QAction *addEventAct = new QAction(tr("+"), this);
-    eventsWidget->addAction(addEventAct);
-    QAction *removeEventAct = new QAction(tr("-"), this);
-    eventsWidget->addAction(removeEventAct);
-    QAction *moreEventAct = new QAction(tr(">>"), this);
-    eventsWidget->addAction(moreSeasonAct);
+    eventsWidget = new GcSplitterItem(tr("Events"), iconFromPNG(":images/sidebar/bookmark.png"), this);
+    QAction *moreEventAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    eventsWidget->addAction(moreEventAct);
     connect(moreEventAct, SIGNAL(triggered(void)), this, SLOT(eventPopup(void)));
 
 
-
     eventTree = new QTreeWidget;
+    eventTree->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     //allEvents = new QTreeWidgetItem(eventTree, ROOT_TYPE);
     allEvents = eventTree->invisibleRootItem();
     allEvents->setText(0, tr("Events"));
@@ -115,20 +100,16 @@ LTMSidebar::LTMSidebar(MainWindow *parent, const QDir &home) : QWidget(parent), 
 
     configChanged(); // will reset the metric tree
 
-    splitter = new QSplitter;
-    splitter->setHandleWidth(1);
-    splitter->setFrameStyle(QFrame::NoFrame);
-    splitter->setContentsMargins(0,0,0,0);
-    splitter->setOrientation(Qt::Vertical);
+    splitter = new GcSplitter(Qt::Vertical);
     splitter->addWidget(seasonsWidget);
     splitter->addWidget(eventsWidget);
-    connect(splitter,SIGNAL(splitterMoved(int,int)), this, SLOT(splitterMoved(int,int)));
 
-    GcSideBarItem *summaryWidget = new GcSideBarItem(tr("Sumary"), this);
+    GcSplitterItem *summaryWidget = new GcSplitterItem(tr("Summary"), iconFromPNG(":images/sidebar/dashboard.png"), this);
 
     summary = new QWebView(this);
     summary->setContentsMargins(0,0,0,0);
     summary->page()->view()->setContentsMargins(0,0,0,0);
+    summary->page()->mainFrame()->setScrollBarPolicy(Qt::Vertical, Qt::ScrollBarAlwaysOff);
     summary->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     summary->setAcceptDrops(false);
 
@@ -141,17 +122,7 @@ LTMSidebar::LTMSidebar(MainWindow *parent, const QDir &home) : QWidget(parent), 
 
     mainLayout->addWidget(splitter);
 
-    // restore splitter
-    QVariant splitterSizes = appsettings->cvalue(main->cyclist, GC_SETTINGS_LTMSPLITTER_SIZES); 
-    if (splitterSizes != QVariant()) {
-        splitter->restoreState(splitterSizes.toByteArray());
-        splitter->setOpaqueResize(true); // redraw when released, snappier UI
-    } else {
-        QList<int> sizes;
-        sizes.append(400);
-        sizes.append(400);
-        splitter->setSizes(sizes);
-    }
+    splitter->prepare(main->cyclist, "LTM");
 
     // our date ranges
     connect(dateRangeTree,SIGNAL(itemSelectionChanged()), this, SLOT(dateRangeTreeWidgetSelectionChanged()));
@@ -213,6 +184,8 @@ LTMSidebar::dateRangeTreeWidgetSelectionChanged()
 
         // make sure they fit
         eventTree->header()->resizeSections(QHeaderView::ResizeToContents);
+        appsettings->setCValue(main->cyclist, GC_LTM_LAST_DATE_RANGE, dateRange->id().toString());
+
     }
 
     // Let the view know its changed....
@@ -230,20 +203,18 @@ LTMSidebar::resetSeasons()
 {
     if (active == true) return;
 
-    QString now;
-
-    // remember currebt
-    if (dateRangeTree->selectedItems().count())
-        now = dateRangeTree->selectedItems().first()->text(0);
-
     active = true;
     int i;
     for (i=allDateRanges->childCount(); i > 0; i--) {
         delete allDateRanges->takeChild(0);
     }
+    QString id = appsettings->cvalue(main->cyclist, GC_LTM_LAST_DATE_RANGE, seasons->seasons.at(0).id().toString()).toString();
     for (i=0; i <seasons->seasons.count(); i++) {
         Season season = seasons->seasons.at(i);
         QTreeWidgetItem *add = new QTreeWidgetItem(allDateRanges, season.getType());
+        if (season.id().toString()==id)
+            add->setSelected(true);
+
         // No Drag/Drop for temporary  Season
         if (season.getType() == Season::temporary)
             add->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled);
@@ -252,8 +223,6 @@ LTMSidebar::resetSeasons()
         add->setText(0, season.getName());
     }
 
-    // get current back!
-    if (now == "") allDateRanges->child(0)->setSelected(true); // just select first child
     active = false;
 }
 
@@ -287,7 +256,6 @@ LTMSidebar::dateRangePopup(QPoint pos)
             || seasons->seasons[index].getType() == Season::temporary) {
             // on system date we just offer to add a Season, since its
             // the only way of doing it when no seasons are defined!!
-            activeDateRange = NULL;
 
             // create context menu
             QMenu menu(dateRangeTree);
@@ -301,9 +269,6 @@ LTMSidebar::dateRangePopup(QPoint pos)
             menu.exec(dateRangeTree->mapToGlobal(pos));
 
         } else {
-
-            // save context
-            activeDateRange = item;
 
             // create context menu
             QMenu menu(dateRangeTree);
@@ -358,7 +323,8 @@ LTMSidebar::dateRangePopup()
         connect(event, SIGNAL(triggered(void)), this, SLOT(addEvent(void)));
     }
     // execute the menu
-    menu.exec(dateRangeTree->mapToGlobal(QPoint(dateRangeTree->pos().x()+dateRangeTree->width()-30,seasonsWidget->pos().y()-30)));
+    menu.exec(splitter->mapToGlobal(QPoint(seasonsWidget->pos().x()+seasonsWidget->width()-20,
+                                           seasonsWidget->pos().y())));
 }
 
 void
@@ -371,10 +337,7 @@ LTMSidebar::eventPopup(QPoint pos)
 
     // save context - which season and event are we working with?
     QTreeWidgetItem *which = dateRangeTree->selectedItems().first();
-    if (which && which != allDateRanges) {
-        activeDateRange = which;
-        activeEvent = item;
-    } else return;
+    if (!which || which == allDateRanges) return;
 
     // OK - we are working with a specific event..
     QMenu menu(eventTree);
@@ -402,13 +365,24 @@ LTMSidebar::eventPopup(QPoint pos)
 void
 LTMSidebar::eventPopup()
 {
-    // no current season selected
-    if (eventTree->selectedItems().isEmpty()) return;
+    // events are against a selected season
+    if (dateRangeTree->selectedItems().count() == 0) return; // need a season selected!
 
-    QTreeWidgetItem *item = eventTree->selectedItems().at(0);
+    // and the season must be user defined not temporary
+    int seasonindex = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
+    if (seasons->seasons[seasonindex].getType() == Season::temporary) return;
 
-    // OK - we are working with a specific event..
+    // have we selected an event?
+    QTreeWidgetItem *item = NULL;
+    if (!eventTree->selectedItems().isEmpty()) item = eventTree->selectedItems().at(0);
+
     QMenu menu(eventTree);
+
+    // we can always add, regardless of any event being selected...
+    QAction *addEvent = new QAction(tr("Add event"), eventTree);
+    menu.addAction(addEvent);
+    connect(addEvent, SIGNAL(triggered(void)), this, SLOT(addEvent(void)));
+
     if (item != NULL && item->type() != ROOT_TYPE && allEvents->indexOfChild(item) != -1) {
 
         QAction *edit = new QAction(tr("Edit details"), eventTree);
@@ -421,19 +395,14 @@ LTMSidebar::eventPopup()
         connect(del, SIGNAL(triggered(void)), this, SLOT(deleteEvent(void)));
     }
 
-    // we can always add, regardless of any event being selected...
-    QAction *addEvent = new QAction(tr("Add event"), eventTree);
-    menu.addAction(addEvent);
-    connect(addEvent, SIGNAL(triggered(void)), this, SLOT(addEvent(void)));
-
     // execute the menu
-    menu.exec(eventTree->mapToGlobal(QPoint(eventTree->pos().x()+eventTree->width()-30,eventTree->pos().y()-30)));
+    menu.exec(splitter->mapToGlobal(QPoint(eventsWidget->pos().x()+eventsWidget->width()-20, eventsWidget->pos().y())));
 }
 
 void
 LTMSidebar::dateRangeChanged(QTreeWidgetItem*item, int)
 {
-    if (item != activeDateRange || active == true) return;
+    if (active == true) return;
 
     int index = allDateRanges->indexOfChild(item);
     seasons->seasons[index].setName(item->text(0));
@@ -496,8 +465,9 @@ void
 LTMSidebar::editRange()
 {
     // throw up modal dialog box to edit all the season
-    // fields.
-    int index = allDateRanges->indexOfChild(activeDateRange);
+    if (dateRangeTree->selectedItems().count() != 1) return;
+
+    int index = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
     EditSeasonDialog dialog(main, &seasons->seasons[index]);
 
     if (dialog.exec()) {
@@ -505,22 +475,22 @@ LTMSidebar::editRange()
         active = true;
 
         // update name
-        activeDateRange->setText(0, seasons->seasons[index].getName());
+        dateRangeTree->selectedItems().first()->setText(0, seasons->seasons[index].getName());
 
         // save changes away
         seasons->writeSeasons();
         active = false;
 
-        // signal its changed!
-        //dateRangeSelected(&seasons->seasons[index]);
     }
 }
 
 void
 LTMSidebar::deleteRange()
 {
+    if (dateRangeTree->selectedItems().count() != 1) return;
+    int index = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
+
     // now delete!
-    int index = allDateRanges->indexOfChild(activeDateRange);
     delete allDateRanges->takeChild(index);
     seasons->deleteSeason(index);
 }
@@ -528,8 +498,13 @@ LTMSidebar::deleteRange()
 void
 LTMSidebar::addEvent()
 {
+    if (dateRangeTree->selectedItems().count() == 0) return; // need a season selected!
+
+    int seasonindex = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
+
+    if (seasons->seasons[seasonindex].getType() == Season::temporary) return; // must be a user season
+
     SeasonEvent myevent("", QDate());
-    int seasonindex = allDateRanges->indexOfChild(activeDateRange);
     EditSeasonEventDialog dialog(main, &myevent);
 
     if (dialog.exec()) {
@@ -555,43 +530,58 @@ LTMSidebar::deleteEvent()
 {
     active = true;
 
-    // now delete!
-    int seasonindex = allDateRanges->indexOfChild(activeDateRange);
-    int eventindex = allEvents->indexOfChild(activeEvent);
+    if (dateRangeTree->selectedItems().count()) {
 
-    // wipe them away
-    delete allEvents->takeChild(eventindex);
-    seasons->seasons[seasonindex].events.removeAt(eventindex);
+        int seasonindex = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
 
-    // save changes away
-    seasons->writeSeasons();
+        // only delete those that are selected
+        if (eventTree->selectedItems().count() > 0) {
 
+            // wipe them away
+            foreach(QTreeWidgetItem *d, eventTree->selectedItems()) {
+                int index = allEvents->indexOfChild(d);
+
+                delete allEvents->takeChild(index);
+                seasons->seasons[seasonindex].events.removeAt(index);
+            }
+        }
+
+        // save changes away
+        seasons->writeSeasons();
+
+    }
     active = false;
 }
 
 void
 LTMSidebar::editEvent()
 {
-    int seasonindex = allDateRanges->indexOfChild(activeDateRange);
-    int eventindex = allEvents->indexOfChild(activeEvent);
+    active = true;
 
-    EditSeasonEventDialog dialog(main, &seasons->seasons[seasonindex].events[eventindex]);
+    if (dateRangeTree->selectedItems().count()) {
 
-    if (dialog.exec()) {
+        int seasonindex = allDateRanges->indexOfChild(dateRangeTree->selectedItems().first());
 
-        active = true;
+        // only delete those that are selected
+        if (eventTree->selectedItems().count() == 1) {
 
-        // update name
-        activeEvent->setText(0, seasons->seasons[seasonindex].events[eventindex].name);
-        activeEvent->setText(1, seasons->seasons[seasonindex].events[eventindex].date.toString("MMM d, yyyy"));
+            QTreeWidgetItem *ours = eventTree->selectedItems().first();
+            int index = allEvents->indexOfChild(ours);
 
-        // save changes away
-        seasons->writeSeasons();
-        active = false;
+            EditSeasonEventDialog dialog(main, &seasons->seasons[seasonindex].events[index]);
 
-        // signal its changed!
-        //dateRangeSelected(&seasons->seasons[index]);
+            if (dialog.exec()) {
+
+                // update name
+                ours->setText(0, seasons->seasons[seasonindex].events[index].name);
+                ours->setText(1, seasons->seasons[seasonindex].events[index].date.toString("MMM d, yyyy"));
+
+                // save changes away
+                seasons->writeSeasons();
+            }
+        }
     }
+    active = false;
 }
 
 void
@@ -724,10 +714,4 @@ LTMSidebar::setSummary(DateRange dateRange)
         summary->page()->mainFrame()->setHtml(summaryText);
 
     }
-}
-
-void
-LTMSidebar::splitterMoved(int, int)
-{
-    appsettings->setCValue(main->cyclist, GC_SETTINGS_LTMSPLITTER_SIZES, splitter->saveState());
 }

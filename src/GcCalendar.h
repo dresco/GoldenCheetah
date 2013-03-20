@@ -30,6 +30,8 @@
 #include "RideItem.h"
 #include "RideNavigator.h"
 
+#include "GcSideBarItem.h"
+
 // Catch signal, no background and do embossed text
 class GcLabel : public QLabel
 {
@@ -62,6 +64,74 @@ protected:
     QColor bgColor; 
 };
 
+class GcMiniCalendar : public QWidget
+{
+    Q_OBJECT
+
+    public:
+
+        GcMiniCalendar(MainWindow *, bool master);
+
+        void setDate(int month, int year);
+        void getDate(int &_month, int &_year) { _month = month; _year = year; }
+        void clearRide();
+
+    public slots:
+
+        void setRide(RideItem *ride);
+        void refresh(); 
+
+        void dayClicked(int num); // for when a day is selected
+        void next();
+        void previous();
+
+        bool event(QEvent *e);
+
+    signals:
+        void dateChanged(int month, int year);
+
+    protected:
+        MainWindow *main;
+        RideItem *_ride;
+        int month, year;
+
+        QVBoxLayout *layout;
+
+        GcLabel *left, *right; // < ... >
+        GcLabel *monthName; // January 2012
+        GcLabel *dayNames[7]; // Mon .. Sun
+
+        QList<GcLabel*> dayLabels; // 1 .. 31
+
+        QSignalMapper *signalMapper; // for mapping dayLabels "clicked"
+
+        QPalette black, grey, white;
+        QList<FieldDefinition> fieldDefinitions;
+        GcCalendarModel *calendarModel;
+        bool master;
+};
+
+class GcMultiCalendar : public QScrollArea
+{
+    Q_OBJECT
+
+    public:
+
+        GcMultiCalendar(MainWindow*);
+        void refresh();
+
+    public slots:
+        void dateChanged(int month, int year);
+        void setRide(RideItem *ride);
+        void resizeEvent(QResizeEvent*);
+
+    private:
+        QVBoxLayout *layout;
+        QVector<GcMiniCalendar*> calendars;
+        MainWindow *main;
+        int showing;
+};
+
 class GcCalendar : public QWidget // not a GcWindow - belongs on sidebar
 {
     Q_OBJECT
@@ -75,16 +145,7 @@ class GcCalendar : public QWidget // not a GcWindow - belongs on sidebar
 
         void setRide(RideItem *ride);
         void refresh(); 
-
-        void dayClicked(int num); // for when a day is selected
-        void next();
-        void previous();
-
-        bool event(QEvent *e);
         void setSummary(); // set the summary at the bottom
-
-        // summary metrics aggregator -- refactor later
-        void splitterMoved(int pos, int index);
 
     signals:
         void dateRangeChanged(DateRange);
@@ -97,23 +158,12 @@ class GcCalendar : public QWidget // not a GcWindow - belongs on sidebar
         QVBoxLayout *layout;
         QGridLayout *dayLayout; // contains the day names and days
 
-        GcLabel *dayNumber; // the big NUmber at top
-        GcLabel *dayName;   // what day of the week
-        GcLabel *dayDate;   // Date string
-
-        GcLabel *left, *right; // < ... >
-        GcLabel *monthName; // January 2012
-        GcLabel *dayNames[7]; // Mon .. Sun
-
-        QList<GcLabel*> dayLabels; // 1 .. 31
-
-        QSignalMapper *signalMapper; // for mapping dayLabels "clicked"
+        GcMultiCalendar *multiCalendar;
 
         QPalette black, grey, white;
-        QList<FieldDefinition> fieldDefinitions;
-        GcCalendarModel *calendarModel;
-
-        QSplitter *splitter; // calendar vs summary
+        GcSplitter *splitter; // calendar vs summary
+        GcSplitterItem *calendarItem,
+                       *summaryItem;
 
         QComboBox *summarySelect;
         QWebView *summary;

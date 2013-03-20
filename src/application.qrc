@@ -124,9 +124,21 @@
         <file>images/mac/scope-inactive.png</file>
         <file>images/mac/hide.png</file>
         <file>images/mac/show.png</file>
+        <file>images/mac/sidebar.png</file>
+        <file>images/mac/left.png</file>
+        <file>images/mac/right.png</file>
         <file>images/analysis.png</file>
         <file>images/home.png</file>
         <file>images/diary.png</file>
         <file>images/train.png</file>
+        <file>images/sidebar/bookmark.png</file>
+        <file>images/sidebar/calendar.png</file>
+        <file>images/sidebar/dashboard.png</file>
+        <file>images/sidebar/minus.png</file>
+        <file>images/sidebar/plus.png</file>
+        <file>images/sidebar/extra.png</file>
+        <file>images/sidebar/folder.png</file>
+        <file>images/sidebar/movie.png</file>
+        <file>images/sidebar/power.png</file>
     </qresource>
 </RCC>

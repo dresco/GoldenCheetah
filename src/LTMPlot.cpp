@@ -314,9 +314,8 @@ LTMPlot::setData(LTMSettings *set)
                 QBrush brush = QBrush(brushColor);
                 current->setBrush(brush);
             } else {
-                brushColor.setAlpha(100); // now side by side, less transparency required
-                QColor brushColor1 = brushColor;
-                brushColor1.setAlpha(255);
+                brushColor.setAlpha(64); // now side by side, less transparency required
+                QColor brushColor1 = brushColor.darker();
 
                 QLinearGradient linearGradient(0, 0, 0, height());
                 linearGradient.setColorAt(0.0, brushColor1);
@@ -356,7 +355,7 @@ LTMPlot::setData(LTMSettings *set)
                 double y = (double) ydata[i];
 
                 xaxis[offset] = x +left;
-                yaxis[offset] = 0;
+                yaxis[offset] = metricDetail.baseline; // use baseline not 0, default is 0
                 offset++;
                 xaxis[offset] = x+left;
                 yaxis[offset] = y;
@@ -365,7 +364,7 @@ LTMPlot::setData(LTMSettings *set)
                 yaxis[offset] = y;
                 offset++;
                 xaxis[offset] = x +right;
-                yaxis[offset] = 0;
+                yaxis[offset] = metricDetail.baseline;; // use baseline not 0, default is 0
                 offset++;
             }
             xdata = xaxis;
@@ -600,9 +599,8 @@ LTMPlot::setData(LTMSettings *set)
             
             // fill the bars
             QColor brushColor = metricDetail.penColor;
-            brushColor.setAlpha(100); // now side by side, less transparency required
-            QColor brushColor1 = metricDetail.penColor;
-            brushColor1.setAlpha(255); // now side by side, less transparency required
+            brushColor.setAlpha(64); // now side by side, less transparency required
+            QColor brushColor1 = metricDetail.penColor.darker();
             QLinearGradient linearGradient(0, 0, 0, height());
             linearGradient.setColorAt(0.0, brushColor1);
             linearGradient.setColorAt(1.0, brushColor);
@@ -641,7 +639,7 @@ LTMPlot::setData(LTMSettings *set)
                 double y = (double) ydata[i];
 
                 xaxis[offset] = x +left;
-                yaxis[offset] = 0;
+                yaxis[offset] = metricDetail.baseline;; // use baseline not 0, default is 0
                 offset++;
                 xaxis[offset] = x+left;
                 yaxis[offset] = y;
@@ -650,7 +648,7 @@ LTMPlot::setData(LTMSettings *set)
                 yaxis[offset] = y;
                 offset++;
                 xaxis[offset] = x +right;
-                yaxis[offset] = 0;
+                yaxis[offset] = metricDetail.baseline;; // use baseline not 0, default is 0
                 offset++;
             }
             xdata = xaxis;
@@ -668,6 +666,13 @@ LTMPlot::setData(LTMSettings *set)
             sym.setBrush(QBrush(metricDetail.penColor));
             current->setSymbol(new QwtSymbol(sym));
             current->setPen(cpen);
+
+            // fill below the line
+            if (metricDetail.fillCurve) {
+                QColor fillColor = metricDetail.penColor;
+                fillColor.setAlpha(60);
+                current->setBrush(fillColor);
+            }
 
 
         } else if (metricDetail.curveStyle == QwtPlotCurve::Dots) {
@@ -1050,14 +1055,11 @@ LTMPlot::pointHover(QwtPlotCurve *curve, int index)
 
         LTMScaleDraw *lsd = new LTMScaleDraw(settings->start, groupForDate(settings->start.date(), settings->groupBy), settings->groupBy);
         QwtText startText = lsd->label((int)(curve->sample(index).x()+0.5));
-        QwtText endText;
-        endText   = lsd->label((int)(curve->sample(index).x()+1.5));
-
 
         if (settings->groupBy != LTM_WEEK)
             datestr = startText.text();
         else
-            datestr = QString("%1 - %2").arg(startText.text()).arg(endText.text());
+            datestr = QString(tr("Week Commencing %1")).arg(startText.text());
 
         datestr = datestr.replace('\n', ' ');
 

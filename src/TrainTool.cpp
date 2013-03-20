@@ -53,6 +53,7 @@
 
 #include <math.h> // isnan and isinf
 #include "TrainDB.h"
+#include "Library.h"
 
 TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), home(home), main(parent)
 {
@@ -116,9 +117,7 @@ TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), h
     deviceTree->header()->hide();
     deviceTree->setAlternatingRowColors (false);
     deviceTree->setIndentation(5);
-    allDevices = new QTreeWidgetItem(deviceTree, HEAD_TYPE);
-    allDevices->setText(0, tr("Devices"));
-    deviceTree->expandItem(allDevices);
+    deviceTree->expandItem(deviceTree->invisibleRootItem());
     deviceTree->setContextMenuPolicy(Qt::CustomContextMenu);
 
     workoutModel = new QSqlTableModel(this, trainDB->connection());
@@ -284,20 +283,36 @@ TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), h
     recordSelector->setChecked(Qt::Checked);
     recordSelector->hide(); // we don't let users change this for now
 
-    trainSplitter = new QSplitter;
-    trainSplitter->setHandleWidth(1);
-    trainSplitter->setFrameStyle(QFrame::NoFrame);
-    trainSplitter->setOrientation(Qt::Vertical);
+    trainSplitter = new GcSplitter(Qt::Vertical);
     trainSplitter->setContentsMargins(0,0,0,0);
-    trainSplitter->setLineWidth(0);
-    trainSplitter->setMidLineWidth(0);
+    deviceItem = new GcSplitterItem(tr("Devices"), iconFromPNG(":images/sidebar/power.png"), this);
 
+    // devices splitter actions
+    QAction *moreDeviceAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    deviceItem->addAction(moreDeviceAct);
+    connect(moreDeviceAct, SIGNAL(triggered(void)), this, SLOT(devicePopup(void)));
+
+    workoutItem = new GcSplitterItem(tr("Workouts"), iconFromPNG(":images/sidebar/folder.png"), this);
+    QAction *moreWorkoutAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    workoutItem->addAction(moreWorkoutAct);
+    connect(moreWorkoutAct, SIGNAL(triggered(void)), this, SLOT(workoutPopup(void)));
+
+    deviceItem->addWidget(deviceTree);
+    trainSplitter->addWidget(deviceItem);
+    workoutItem->addWidget(workoutTree);
+    trainSplitter->addWidget(workoutItem);
     cl->addWidget(trainSplitter);
-    trainSplitter->addWidget(deviceTree);
-    trainSplitter->addWidget(workoutTree);
+
+
 #if defined Q_OS_MAC || defined GC_HAVE_VLC
-    trainSplitter->addWidget(mediaTree);
+    mediaItem = new GcSplitterItem(tr("Media"), iconFromPNG(":images/sidebar/movie.png"), this);
+    QAction *moreMediaAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    mediaItem->addAction(moreMediaAct);
+    connect(moreMediaAct, SIGNAL(triggered(void)), this, SLOT(mediaPopup(void)));
+    mediaItem->addWidget(mediaTree);
+    trainSplitter->addWidget(mediaItem);
 #endif
+    trainSplitter->prepare(main->cyclist, "train");
 
 #ifdef Q_OS_MAC
     // get rid of annoying focus rectangle for sidebar components
@@ -325,7 +340,6 @@ TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), h
 
     // set home
     main = parent;
-    streamController = NULL;
     ergFile = NULL;
     calibrating = false;
 
@@ -335,7 +349,6 @@ TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), h
     // now the GUI is setup lets sort our control variables
     gui_timer = new QTimer(this);
     disk_timer = new QTimer(this);
-    stream_timer = new QTimer(this);
     load_timer = new QTimer(this);
 
     session_time = QTime();
@@ -360,7 +373,6 @@ TrainTool::TrainTool(MainWindow *parent, const QDir &home) : GcWindow(parent), h
 
     connect(gui_timer, SIGNAL(timeout()), this, SLOT(guiUpdate()));
     connect(disk_timer, SIGNAL(timeout()), this, SLOT(diskUpdate()));
-    connect(stream_timer, SIGNAL(timeout()), this, SLOT(streamUpdate()));
     connect(load_timer, SIGNAL(timeout()), this, SLOT(loadUpdate()));
 
     configChanged(); // will reset the workout tree
@@ -401,6 +413,71 @@ TrainTool::refresh()
 }
 
 void
+TrainTool::workoutPopup()
+{
+    // OK - we are working with a specific event..
+    QMenu menu(workoutTree);
+    QAction *import = new QAction(tr("Import Workout from File"), workoutTree);
+    QAction *download = new QAction(tr("Get Workouts from ErgDB"), workoutTree);
+    QAction *wizard = new QAction(tr("Create Workout via Wizard"), workoutTree);
+    QAction *scan = new QAction(tr("Scan for Workouts"), workoutTree);
+
+    menu.addAction(import);
+    menu.addAction(download);
+    menu.addAction(wizard);
+    menu.addAction(scan);
+
+    // we can delete too
+    QModelIndex current = workoutTree->currentIndex();
+    QModelIndex target = sortModel->mapToSource(current);
+    QString filename = workoutModel->data(workoutModel->index(target.row(), 0), Qt::DisplayRole).toString();
+    if (QFileInfo(filename).exists()) {
+        QAction *del = new QAction(tr("Delete selected workout"), workoutTree);
+        menu.addAction(del);
+        connect(del, SIGNAL(triggered(void)), this, SLOT(deleteWorkouts(void)));
+    }
+
+    // connect menu to functions
+    connect(import, SIGNAL(triggered(void)), main, SLOT(importWorkout(void)));
+    connect(wizard, SIGNAL(triggered(void)), main, SLOT(showWorkoutWizard(void)));
+    connect(download, SIGNAL(triggered(void)), main, SLOT(downloadErgDB(void)));
+    connect(scan, SIGNAL(triggered(void)), main, SLOT(manageLibrary(void)));
+
+    // execute the menu
+    menu.exec(trainSplitter->mapToGlobal(QPoint(workoutItem->pos().x()+workoutItem->width()-20,
+                                           workoutItem->pos().y())));
+}
+
+void
+TrainTool::mediaPopup()
+{
+    // OK - we are working with a specific event..
+    QMenu menu(mediaTree);
+    QAction *import = new QAction(tr("Import Video from File"), mediaTree);
+    QAction *scan = new QAction(tr("Scan for Videos"), mediaTree);
+
+    menu.addAction(import);
+    menu.addAction(scan);
+
+    // connect menu to functions
+    connect(import, SIGNAL(triggered(void)), main, SLOT(importWorkout(void)));
+    connect(scan, SIGNAL(triggered(void)), main, SLOT(manageLibrary(void)));
+
+    QModelIndex current = mediaTree->currentIndex();
+    QModelIndex target = vsortModel->mapToSource(current);
+    QString filename = videoModel->data(videoModel->index(target.row(), 0), Qt::DisplayRole).toString();
+    if (QFileInfo(filename).exists()) {
+        QAction *del = new QAction(tr("Delete selected video"), workoutTree);
+        menu.addAction(del);
+        connect(del, SIGNAL(triggered(void)), this, SLOT(deleteVideos(void)));
+    }
+
+    // execute the menu
+    menu.exec(trainSplitter->mapToGlobal(QPoint(mediaItem->pos().x()+mediaItem->width()-20,
+                                           mediaItem->pos().y())));
+}
+
+void
 TrainTool::configChanged()
 {
     setProperty("color", GColor(CRIDEPLOTBACKGROUND));
@@ -408,7 +485,7 @@ TrainTool::configChanged()
     // DEVICES
 
     // zap whats there
-    QList<QTreeWidgetItem *> devices = allDevices->takeChildren();
+    QList<QTreeWidgetItem *> devices = deviceTree->invisibleRootItem()->takeChildren();
     for (int i=0; i<devices.count(); i++) delete devices.at(i);
 
     if (appsettings->value(this, TRAIN_MULTI, false).toBool() == true)
@@ -425,7 +502,7 @@ TrainTool::configChanged()
     for (int i=0; i<Devices.count(); i++) {
 
         // add to the selection tree
-        QTreeWidgetItem *device = new QTreeWidgetItem(allDevices, i);
+        QTreeWidgetItem *device = new QTreeWidgetItem(deviceTree->invisibleRootItem(), i);
         device->setText(0, Devices.at(i).name);
 
         // Create the controllers for each device
@@ -452,7 +529,7 @@ TrainTool::configChanged()
 
     // select the first device
     if (Devices.count()) {
-        deviceTree->setCurrentItem(allDevices->child(0));
+        deviceTree->setCurrentItem(deviceTree->invisibleRootItem()->child(0));
     }
     // And select default workout to Ergo
     QModelIndex firstWorkout = sortModel->index(0, 0, QModelIndex());
@@ -464,26 +541,6 @@ TrainTool::configChanged()
 
     // metric or imperial changed?
     useMetricUnits = main->useMetricUnits;
-}
-
-/*----------------------------------------------------------------------
- * Race Server Selected
- *----------------------------------------------------------------------*/
-void
-TrainTool::serverTreeWidgetSelectionChanged()
-{
-    serverSelected();
-}
-
-int
-TrainTool::selectedServerNumber()
-{
-    if (serverTree->selectedItems().isEmpty()) return -1;
-
-    QTreeWidgetItem *selected = serverTree->selectedItems().first();
-
-    if (selected->type() == HEAD_TYPE) return -1;
-    else return selected->type();
 }
 
 /*----------------------------------------------------------------------
@@ -611,6 +668,68 @@ TrainTool::listWorkoutFiles(const QDir &dir) const
 }
 
 void
+TrainTool::deleteVideos()
+{
+    QModelIndex current = mediaTree->currentIndex();
+    QModelIndex target = vsortModel->mapToSource(current);
+    QString filename = videoModel->data(videoModel->index(target.row(), 0), Qt::DisplayRole).toString();
+
+    if (QFileInfo(filename).exists()) {
+        // are you sure?
+        QMessageBox msgBox;
+        msgBox.setText(tr("Are you sure you want to delete this video?"));
+        msgBox.setInformativeText(filename);
+        QPushButton *deleteButton = msgBox.addButton(tr("Delete"),QMessageBox::YesRole);
+        msgBox.setStandardButtons(QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel);
+        msgBox.setIcon(QMessageBox::Critical);
+        msgBox.exec();
+
+        if(msgBox.clickedButton() != deleteButton) return;
+
+        // delete from disk
+        //XXX QFile(filename).remove(); // lets not for now..
+
+        // remove any reference (from drag and drop)
+        Library *l = Library::findLibrary("Media Library");
+        if (l) l->removeRef(main, filename);
+
+        // delete from DB
+        trainDB->startLUW();
+        trainDB->deleteVideo(filename);
+        trainDB->endLUW();
+    }
+}
+void
+TrainTool::deleteWorkouts()
+{
+    QModelIndex current = workoutTree->currentIndex();
+    QModelIndex target = sortModel->mapToSource(current);
+    QString filename = workoutModel->data(workoutModel->index(target.row(), 0), Qt::DisplayRole).toString();
+
+    if (QFileInfo(filename).exists()) {
+        // are you sure?
+        QMessageBox msgBox;
+        msgBox.setText(tr("Are you sure you want to delete this workout?"));
+        msgBox.setInformativeText(filename);
+        QPushButton *deleteButton = msgBox.addButton(tr("Delete"),QMessageBox::YesRole);
+        msgBox.setStandardButtons(QMessageBox::Cancel);
+        msgBox.setDefaultButton(QMessageBox::Cancel);
+        msgBox.setIcon(QMessageBox::Critical);
+        msgBox.exec();
+
+        if(msgBox.clickedButton() != deleteButton) return;
+
+        // delete from disk
+        QFile(filename).remove();
+        // delete from DB
+        trainDB->startLUW();
+        trainDB->deleteWorkout(filename);
+        trainDB->endLUW();
+    }
+}
+
+void
 TrainTool::mediaTreeWidgetSelectionChanged()
 {
 
@@ -623,45 +742,6 @@ TrainTool::mediaTreeWidgetSelectionChanged()
 /*--------------------------------------------------------------------------------
  * Was realtime window, now local and manages controller and chart updates etc
  *------------------------------------------------------------------------------*/
-
-// open a connection to the GoldenServer via a GoldenClient
-void TrainTool::setStreamController()
-{
-    int deviceno = selectedServerNumber();
-
-    if (deviceno == -1) return;
-
-    // zap the current one
-    if (streamController != NULL) {
-        delete streamController;
-        streamController = NULL;
-    }
-
-    if (Devices.count() > 0) {
-        DeviceConfiguration config = Devices.at(deviceno);
-        streamController = new GoldenClient;
-
-        // connect
-        QStringList speclist = config.portSpec.split(":", QString::SkipEmptyParts);
-        bool rc = streamController->connect(speclist[0], // host
-                                  speclist[1].toInt(),   // port
-                                  "9cf638294030cea7b1590a4ca32e7f58", // raceid
-                                  appsettings->cvalue(main->cyclist, GC_NICKNAME).toString(), // name
-                                  FTP, // CP60
-                                  appsettings->cvalue(main->cyclist, GC_WEIGHT).toDouble()); // weight
-
-        // no connection
-        if (rc == false) {
-            streamController->closeAndExit();
-            streamController = NULL;
-            status &= ~RT_STREAMING;
-            QMessageBox msgBox;
-            msgBox.setText(QString(tr("Cannot Connect to Server %1 on port %2").arg(speclist[0]).arg(speclist[1])));
-            msgBox.setIcon(QMessageBox::Critical);
-            msgBox.exec();
-        }
-    }
-}
 
 void TrainTool::Start()       // when start button is pressed
 {
@@ -678,7 +758,6 @@ void TrainTool::Start()       // when start button is pressed
         status &=~RT_PAUSED;
         foreach(int dev, devices()) Devices[dev].controller->restart();
         gui_timer->start(REFRESHRATE);
-        if (status & RT_STREAMING) stream_timer->start(STREAMRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         load_period.restart();
         if (status & RT_WORKOUT) load_timer->start(LOADRATE);
@@ -700,7 +779,6 @@ void TrainTool::Start()       // when start button is pressed
         foreach(int dev, devices()) Devices[dev].controller->pause();
         status |=RT_PAUSED;
         gui_timer->stop();
-        if (status & RT_STREAMING) stream_timer->stop();
         if (status & RT_RECORDING) disk_timer->stop();
         if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
@@ -762,9 +840,6 @@ void TrainTool::Start()       // when start button is pressed
         // we're away!
         status |=RT_RUNNING;
 
-        // should we be streaming too?
-        if (streamController != NULL) status |= RT_STREAMING;
-
         load_period.restart();
         session_time.start();
         session_elapsed_msec = 0;
@@ -800,12 +875,6 @@ void TrainTool::Start()       // when start button is pressed
                 disk_timer->start(SAMPLERATE);  // start screen
             }
         }
-
-        // stream
-        if (status & RT_STREAMING) {
-            stream_timer->start(STREAMRATE);
-        }
-
         gui_timer->start(REFRESHRATE);      // start recording
 
     }
@@ -823,7 +892,6 @@ void TrainTool::Pause()        // pause capture to recalibrate
         status &=~RT_PAUSED;
         foreach(int dev, devices()) Devices[dev].controller->restart();
         gui_timer->start(REFRESHRATE);
-        if (status & RT_STREAMING) stream_timer->start(STREAMRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         load_period.restart();
         if (status & RT_WORKOUT) load_timer->start(LOADRATE);
@@ -842,7 +910,6 @@ void TrainTool::Pause()        // pause capture to recalibrate
         foreach(int dev, devices()) Devices[dev].controller->pause();
         status |=RT_PAUSED;
         gui_timer->stop();
-        if (status & RT_STREAMING) stream_timer->stop();
         if (status & RT_RECORDING) disk_timer->stop();
         if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
@@ -899,13 +966,6 @@ void TrainTool::Stop(int deviceStatus)        // when stop button is pressed
             name = recordFile->fileName();
             main->addRide(QFileInfo(name).fileName(), true);
         }
-    }
-
-    if (status & RT_STREAMING) {
-        stream_timer->stop();
-        streamController->closeAndExit();
-        delete streamController;
-        streamController = NULL;
     }
 
     if (status & RT_WORKOUT) {
@@ -1135,39 +1195,6 @@ void TrainTool::warnnoConfig()
 }
 
 //----------------------------------------------------------------------
-// STREAMING FUNCTION
-//----------------------------------------------------------------------
-void
-TrainTool::streamUpdate()
-{
-    // send over the wire...
-    if (streamController) {
-
-        // send my data
-        streamController->sendTelemetry(displayPower,
-                                        displayCadence,
-                                        displayDistance,
-                                        displayHeartRate,
-                                        displaySpeed);
-
-        // get standings for everyone else
-        RaceStatus current = streamController->getStandings();
-
-        // send out to all the widgets...
-        notifyRaceStandings(current);
-
-        // has the race finished?
-        if (current.race_finished == true) {
-            Stop(0); // all over dude
-            QMessageBox msgBox;
-            msgBox.setText(tr("Race Over!"));
-            msgBox.setIcon(QMessageBox::Information);
-            msgBox.exec();
-        }
-    }
-}
-
-//----------------------------------------------------------------------
 // DISK UPDATE FUNCTIONS
 //----------------------------------------------------------------------
 void TrainTool::diskUpdate()
@@ -1261,7 +1288,6 @@ void TrainTool::Calibrate()
         lap_time.start();
         load_period.restart();
         if (status & RT_WORKOUT) load_timer->start(LOADRATE);
-        if (status & RT_STREAMING) stream_timer->start(STREAMRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         main->notifyUnPause(); // get video started again, amongst other things
 
@@ -1297,7 +1323,6 @@ void TrainTool::Calibrate()
         session_elapsed_msec += session_time.elapsed();
         lap_elapsed_msec += lap_time.elapsed();
 
-        if (status & RT_STREAMING) stream_timer->stop();
         if (status & RT_RECORDING) disk_timer->stop();
         if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
@@ -1585,6 +1610,26 @@ MultiDeviceDialog::cancelClicked()
 }
 
 void
+TrainTool::devicePopup()
+{
+    // OK - we are working with a specific event..
+    QMenu menu(deviceTree);
+
+    QAction *addDevice = new QAction(tr("Add Device"), deviceTree);
+    connect(addDevice, SIGNAL(triggered(void)), main, SLOT(addDevice()));
+    menu.addAction(addDevice);
+
+    if (deviceTree->selectedItems().size() == 1) {
+        QAction *delDevice = new QAction(tr("Delete Device"), deviceTree);
+        connect(delDevice, SIGNAL(triggered(void)), this, SLOT(deleteDevice()));
+        menu.addAction(delDevice);
+    }
+
+    // execute the menu
+    menu.exec(trainSplitter->mapToGlobal(QPoint(deviceItem->pos().x()+deviceItem->width()-20,
+                                           deviceItem->pos().y())));
+}
+void
 TrainTool::deviceTreeMenuPopup(const QPoint &pos)
 {
     QMenu menu(deviceTree);
@@ -1610,7 +1655,7 @@ TrainTool::deleteDevice()
 
     // Delete the selected device
     QTreeWidgetItem *selected = deviceTree->selectedItems().first();
-    int index = allDevices->indexOfChild(selected);
+    int index = deviceTree->invisibleRootItem()->indexOfChild(selected);
 
     if (index < 0 || index > list.size()) return;
 

@@ -38,6 +38,7 @@
 %}
 %option noyywrap
 %option nounput
+%option noinput
 %%
 \"RIDE\"            return RIDE;
 \"STARTTIME\"       return STARTTIME;
@@ -64,6 +65,7 @@
 \"HEADWIND\"        return HEADWIND;
 \"SLOPE\"           return SLOPE;
 \"TEMP\"            return TEMP;
+\"LRBALANCE\"       return LRBALANCE;
 [-+]?[0-9]+            return INTEGER;
 [-+]?[0-9]+e-[0-9]+    return FLOAT;
 [-+]?[0-9]+\.[-e0-9]*  return FLOAT;
@@ -71,3 +73,14 @@
 [ \n\t\r]           ;               /* we just ignore whitespace */
 .                   return JsonRideFiletext[0]; /* any other character, typically :, { or } */
 %%
+
+// Older versions of flex (prior to 2.5.9) do not have the destroy function
+// Or We're not using GNU flex then we also won't have a destroy function
+#if !defined(FLEX_SCANNER) || (YY_FLEX_SUBMINOR_VERSION < 9)
+int JsonRideFilelex_destroy(void) { return 0; }
+#endif
+
+void JsonRideFile_setString(QString p)
+{
+    JsonRideFile_scan_string(p.toLatin1().data());
+}

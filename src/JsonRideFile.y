@@ -50,10 +50,12 @@ static double JsonNumber;
 static QStringList JsonRideFileerrors;
 static QMap <QString, QString> JsonOverrides;
 
-// Standard yacc/lex variables / functions
+// Lex scanner
 extern int JsonRideFilelex(); // the lexer aka yylex()
-extern void JsonRideFilerestart (FILE *input_file); // the lexer file restart aka yyrestart()
-extern FILE *JsonRideFilein; // used by the lexer aka yyin
+extern void JsonRideFile_setString(QString);
+extern int JsonRideFilelex_destroy(void); // the cleaner for lexer
+
+// yacc parser
 extern char *JsonRideFiletext; // set by the lexer aka yytext
 void JsonRideFileerror(const char *error) // used by parser aka yyerror()
 { JsonRideFileerrors << error; }
@@ -240,14 +242,25 @@ static int jsonFileReaderRegistered =
 RideFile *
 JsonFileReader::openRideFile(QFile &file, QStringList &errors, QList<RideFile*>*) const
 {
-    // jsonRide is local and static, used in the parser
-    // JsonRideFilein is the FILE * used by the lexer
-    JsonRideFilein = fopen(file.fileName().toLatin1(), "r");
-    if (JsonRideFilein == NULL) {
+    // Read the entire file into a QString -- we avoid using fopen since it
+    // doesn't handle foreign characters well. Instead we use QFile and parse
+    // from a QString
+    QString contents;
+    if (file.exists() && file.open(QFile::ReadOnly | QFile::Text)) {
+
+        // read in the whole thing
+        QTextStream in(&file);
+        contents = in.readAll();
+        file.close();
+
+    } else {
+
         errors << "unable to open file" + file.fileName();
+        return NULL; 
     }
+
     // inform the parser/lexer we have a new file
-    JsonRideFilerestart(JsonRideFilein);
+    JsonRideFile_setString(contents);
 
     // setup
     JsonRide = new RideFile;
@@ -261,8 +274,8 @@ JsonFileReader::openRideFile(QFile &file, QStringList &errors, QList<RideFile*>*
     // parse it
     JsonRideFileparse();
 
-    // release the file handle
-    fclose(JsonRideFilein);
+    // clean up
+    JsonRideFilelex_destroy();
 
     // Only get errors so fail if we have any
     if (errors.count()) {
@@ -407,6 +420,7 @@ JsonFileReader::writeRideFile(MainWindow *, const RideFile *ride, QFile &file) c
             if (ride->areDataPresent()->headwind) out << ", \"HEADWIND\":" << QString("%1").arg(p->headwind);
             if (ride->areDataPresent()->slope) out << ", \"SLOPE\":" << QString("%1").arg(p->slope);
             if (ride->areDataPresent()->temp && p->temp != RideFile::noTemp) out << ", \"TEMP\":" << QString("%1").arg(p->temp);
+            if (ride->areDataPresent()->lrbalance) out << ", \"LRBALANCE\":" << QString("%1").arg(p->lrbalance);
 
             // sample points in here!
             out << " }";

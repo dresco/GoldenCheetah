@@ -1,5 +1,6 @@
 /*
  * Copyright (c) 2006 Sean C. Rhea (srhea@srhea.net)
+ * Copyright (c) 2013 Mark Liversedge (liversedge@gmail.com)
  *
  * This program is free software; you can redistribute it and/or modify it
  * under the terms of the GNU General Public License as published by the Free
@@ -57,7 +58,8 @@
 #include "MetricAggregator.h"
 #include "SplitActivityWizard.h"
 #include "BatchExportDialog.h"
-#include "StravaDialog.h"
+#include "StravaUploadDialog.h"
+#include "StravaDownloadDialog.h"
 #include "RideWithGPSDialog.h"
 #include "TtbDialog.h"
 #include "TwitterDialog.h"
@@ -73,6 +75,7 @@
 
 #include "GcWindowTool.h"
 #include "GcToolBar.h"
+#include "GcSideBarItem.h"
 #ifdef GC_HAVE_SOAP
 #include "TPUploadDialog.h"
 #include "TPDownloadDialog.h"
@@ -85,6 +88,7 @@
 #include "HomeWindow.h"
 #include "GcBubble.h"
 #include "GcCalendar.h"
+#include "GcScopeBar.h"
 #include "LTMSidebar.h"
 
 #ifdef Q_OS_MAC
@@ -95,14 +99,15 @@
 #include "QtMacPopUpButton.h" // mac
 #include "QtMacSegmentedButton.h" // mac
 #include "QtMacSearchBox.h" // mac
-#include "GcScopeBar.h" // mac
 #else
 #include "QTFullScreen.h" // not mac!
+#include "../qtsolutions/segmentcontrol/qtsegmentcontrol.h"
 #endif
 
 #ifdef GC_HAVE_LUCENE
 #include "Lucene.h"
 #include "NamedSearch.h"
+#include "SearchFilterBox.h"
 #endif
 
 #include "ChartSettings.h"
@@ -125,14 +130,28 @@
 #include "WFApi.h"
 #endif
 
+// handy spacer
+class Spacer : public QWidget
+{
+public:
+    Spacer(QWidget *parent) : QWidget(parent) {
+        QSizePolicy sizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+        setSizePolicy(sizePolicy);
+    }
+    QSize sizeHint() const { return QSize(10, 1); }
+};
+
 QList<MainWindow *> mainwindows; // keep track of all the MainWindows we have open
 QDesktopWidget *desktop = NULL;
 
 MainWindow::MainWindow(const QDir &home) :
     home(home), session(0), isclean(false), ismultisave(false),
     zones_(new Zones), hrzones_(new HrZones),
-    ride(NULL), workout(NULL)
+    ride(NULL), workout(NULL), groupByMapper(NULL)
 {
+    cyclist = home.dirName();
+    setInstanceName(cyclist);
+
     #ifdef Q_OS_MAC
     // get an autorelease pool setup
     static CocoaInitializer cocoaInitializer;
@@ -171,7 +190,6 @@ MainWindow::MainWindow(const QDir &home) :
      *--------------------------------------------------------------------*/
 
     setAttribute(Qt::WA_DeleteOnClose);
-
 
     // need to restore geometry before setUnifiedToolBar.. on Mac
     appsettings->setValue(GC_SETTINGS_LAST, home.dirName());
@@ -212,7 +230,7 @@ MainWindow::MainWindow(const QDir &home) :
     head->setContentsMargins(0,0,0,0);
 
     // widgets
-    macAnalButtons = new QWidget(this);
+    QWidget *macAnalButtons = new QWidget(this);
     macAnalButtons->setContentsMargins(0,0,20,0);
 
     // lhs buttons
@@ -243,8 +261,16 @@ MainWindow::MainWindow(const QDir &home) :
     QHBoxLayout *pp = new QHBoxLayout(acts);
     pp->setContentsMargins(0,0,0,0);
     pp->setContentsMargins(0,0,0,0);
-    pp->setSpacing(0);
-    QtMacSegmentedButton *actbuttons = new QtMacSegmentedButton(3, acts);
+    pp->setSpacing(5);
+    sidebar = new QtMacButton(this, QtMacButton::TexturedRounded);
+    QPixmap *sidebarImg = new QPixmap(":images/mac/sidebar.png");
+    sidebar->setImage(sidebarImg);
+    sidebar->setMinimumSize(25, 25);
+    sidebar->setMaximumSize(25, 25);
+    sidebar->setToolTip("Sidebar");
+    sidebar->setSelected(true); // assume always start up with sidebar selected
+
+    actbuttons = new QtMacSegmentedButton(3, acts);
     actbuttons->setWidth(115);
     actbuttons->setNoSelect();
     actbuttons->setImage(0, new QPixmap(":images/mac/stop.png"));
@@ -261,12 +287,14 @@ MainWindow::MainWindow(const QDir &home) :
     viewsel->setContentsMargins(0,0,0,0);
     QHBoxLayout *pq = new QHBoxLayout(viewsel);
     pq->setContentsMargins(0,0,0,0);
-    pq->setSpacing(0);
+    pq->setSpacing(5);
+    pq->addWidget(sidebar);
     styleSelector = new QtMacSegmentedButton(2, viewsel);
     styleSelector->setWidth(80); // actually its 80 but we want a 30px space between is and the searchbox
     styleSelector->setImage(0, new QPixmap(":images/mac/tabbed.png"), 24);
     styleSelector->setImage(1, new QPixmap(":images/mac/tiled.png"), 24);
     pq->addWidget(styleSelector);
+    connect(sidebar, SIGNAL(clicked(bool)), this, SLOT(toggleSidebar()));
     connect(styleSelector, SIGNAL(clicked(int,bool)), this, SLOT(toggleStyle()));
 
     // setup Mac thetoolbar
@@ -309,8 +337,6 @@ MainWindow::MainWindow(const QDir &home) :
      *  Athlete details
      *--------------------------------------------------------------------*/
 
-    cyclist = home.dirName();
-    setInstanceName(cyclist);
     seasons = new Seasons(home);
 
     QVariant unit = appsettings->cvalue(cyclist, GC_UNIT);
@@ -373,182 +399,126 @@ MainWindow::MainWindow(const QDir &home) :
         appsettings->setValue(GC_WORKOUTDIR, QFileInfo(home.absolutePath() + "/../").absolutePath());
 
     /*----------------------------------------------------------------------
-     * Toolbar
+     * Non-Mac Toolbar
      *--------------------------------------------------------------------*/
 
-    toolbar = new GcToolBar(this);
+#ifdef GC_HAVE_LUCENE
+    namedSearches = new NamedSearches(home); // must be before navigator
+#endif
+#ifndef Q_OS_MAC
 
-#ifdef Q_OS_MAC
-    // not on a Mac - we have native, but lets create everything because there are
-    // so many places in the code that reference it, we may as well just allocate
-    // it and hide it. It also means we can reintroduce it at a later date if it
-    // develops into something we want to use cross platform (unlikely I know).
-    toolbar->hide();
+    head = new GcToolBar(this);
+
+    QCleanlooksStyle *toolStyle = new QCleanlooksStyle();
+    QPalette metal;
+    metal.setColor(QPalette::Button, QColor(215,215,215));
+
+    // get those icons
+    importIcon = iconFromPNG(":images/mac/download.png");
+    composeIcon = iconFromPNG(":images/mac/compose.png");
+    intervalIcon = iconFromPNG(":images/mac/stop.png");
+    splitIcon = iconFromPNG(":images/mac/split.png");
+    deleteIcon = iconFromPNG(":images/mac/trash.png");
+    sidebarIcon = iconFromPNG(":images/mac/sidebar.png");
+    tabbedIcon = iconFromPNG(":images/mac/tabbed.png");
+    tiledIcon = iconFromPNG(":images/mac/tiled.png");
+    QSize isize(19,19);
+
+    Spacer *spacerl = new Spacer(this);
+    spacerl->setFixedWidth(5);
+
+    import = new QPushButton(this);
+    import->setIcon(importIcon);
+    import->setIconSize(isize);
+    import->setFixedHeight(25);
+    import->setStyle(toolStyle);
+    import->setToolTip(tr("Download from Device"));
+    import->setPalette(metal);
+    connect(import, SIGNAL(clicked(bool)), this, SLOT(downloadRide()));
+
+    compose = new QPushButton(this);
+    compose->setIcon(composeIcon);
+    compose->setIconSize(isize);
+    compose->setFixedHeight(25);
+    compose->setStyle(toolStyle);
+    compose->setToolTip(tr("Create Manual Activity"));
+    compose->setPalette(metal);
+    connect(compose, SIGNAL(clicked(bool)), this, SLOT(manualRide()));
+
+    sidebar = new QPushButton(this);
+    sidebar->setIcon(sidebarIcon);
+    sidebar->setIconSize(isize);
+    sidebar->setFixedHeight(25);
+    sidebar->setStyle(toolStyle);
+    sidebar->setToolTip(tr("Toggle Sidebar"));
+    sidebar->setPalette(metal);
+    connect(sidebar, SIGNAL(clicked(bool)), this, SLOT(toggleSidebar()));
+
+    actbuttons = new QtSegmentControl(this);
+    actbuttons->setStyle(toolStyle);
+    actbuttons->setIconSize(isize);
+    actbuttons->setCount(3);
+    actbuttons->setSegmentIcon(0, intervalIcon);
+    actbuttons->setSegmentIcon(1, splitIcon);
+    actbuttons->setSegmentIcon(2, deleteIcon);
+    actbuttons->setSelectionBehavior(QtSegmentControl::SelectNone); //wince. spelling. ugh
+    actbuttons->setFixedHeight(25);
+    actbuttons->setSegmentToolTip(0, tr("Find Intervals"));
+    actbuttons->setSegmentToolTip(1, tr("Split Activity"));
+    actbuttons->setSegmentToolTip(2, tr("Delete Activity"));
+    actbuttons->setPalette(metal);
+    connect(actbuttons, SIGNAL(segmentSelected(int)), this, SLOT(actionClicked(int)));
+
+    styleSelector = new QtSegmentControl(this);
+    styleSelector->setStyle(toolStyle);
+    styleSelector->setIconSize(isize);
+    styleSelector->setCount(2);
+    styleSelector->setSegmentIcon(0, tabbedIcon);
+    styleSelector->setSegmentIcon(1, tiledIcon);
+    styleSelector->setSegmentToolTip(0, tr("Tabbed View"));
+    styleSelector->setSegmentToolTip(1, tr("Tiled View"));
+    styleSelector->setSelectionBehavior(QtSegmentControl::SelectOne); //wince. spelling. ugh
+    styleSelector->setFixedHeight(25);
+    styleSelector->setPalette(metal);
+    connect(styleSelector, SIGNAL(segmentSelected(int)), this, SLOT(setStyleFromSegment(int))); //avoid toggle infinitely
+
+    head->addWidget(spacerl);
+    head->addWidget(import);
+    head->addWidget(compose);
+    head->addWidget(actbuttons);
+
+    head->addStretch();
+    head->addWidget(sidebar);
+    head->addWidget(styleSelector);
+
+#ifdef GC_HAVE_LUCENE
+    // add a search box on far right, but with a little space too
+    SearchFilterBox *searchBox = new SearchFilterBox(this,this);
+    searchBox->setStyle(toolStyle);
+    searchBox->setFixedWidth(250);
+    head->addWidget(searchBox);
+#endif
+    Spacer *spacer = new Spacer(this);
+    spacer->setFixedWidth(5);
+    head->addWidget(spacer);
 #endif
 
-    QWidget *lspacer = new QWidget(this);
-    QHBoxLayout *lspacerLayout = new QHBoxLayout(lspacer);
-    lspacerLayout->setSpacing(0);
-    lspacerLayout->setContentsMargins(0,0,0,0);
-    lspacerLayout->addStretch();
-    lspacer->setFixedWidth(100);
-    lspacer->setContentsMargins(0,0,0,0);
-    lspacer->setFocusPolicy(Qt::NoFocus);
-    lspacer->setAutoFillBackground(false);
-    toolbar->addWidget(lspacer);
-
-    // show hide sidebar
-    side = new QPushButton(hideIcon, "", this);
-    side->setToolTip("Show/Hide Sidebar");
-    side->setFocusPolicy(Qt::NoFocus);
-    side->setIconSize(QSize(20,20));
-    side->setAutoFillBackground(false);
-    side->setAutoDefault(false);
-    side->setFlat(true);
-    side->setStyleSheet("background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-    side->setAutoRepeat(true);
-    side->setAutoRepeatDelay(200);
-    lspacerLayout->addWidget(side);
-    connect(side, SIGNAL(clicked()), this, SLOT(toggleSidebar()));
-
-    // switch tab/tile
-    style = new QPushButton(tabIcon, "", this);
-    style->setToolTip("Toggle Tabbed Mode");
-    style->setFocusPolicy(Qt::NoFocus);
-    style->setIconSize(QSize(20,20));
-    style->setAutoFillBackground(false);
-    style->setAutoDefault(false);
-    style->setFlat(true);
-    style->setStyleSheet("background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-    style->setAutoRepeat(true);
-    style->setAutoRepeatDelay(200);
-    lspacerLayout->addWidget(style);
-    connect(style, SIGNAL(clicked()), this, SLOT(toggleStyle()));
-
-#ifndef Q_OS_MAC // full screen is in the unified title and toolbar on a Mac
-    full = new QPushButton(fullIcon, "", this);
-    full->setToolTip("Toggle Full Screen");
-    full->setFocusPolicy(Qt::NoFocus);
-    full->setIconSize(QSize(20,20));
-    full->setAutoFillBackground(false);
-    full->setAutoDefault(false);
-    full->setFlat(true);
-    full->setStyleSheet("background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-    full->setAutoRepeat(true);
-    full->setAutoRepeatDelay(200);
-    lspacerLayout->addWidget(full);
-    connect(full, SIGNAL(clicked()), this, SLOT(toggleFullScreen()));
-#endif
-    lspacerLayout->addStretch();
-
+    /*----------------------------------------------------------------------
+     * Scope Bar
+     *--------------------------------------------------------------------*/
     trainTool = new TrainTool(this, home);
     trainTool->hide();
     trainTool->getToolbarButtons()->hide(); // no show yet
 
-#ifndef Q_OS_MAC
-    toolbar->addWidget(trainTool->getToolbarButtons());
-#else
     scopebar = new GcScopeBar(this, trainTool->getToolbarButtons());
     connect(scopebar, SIGNAL(selectDiary()), this, SLOT(selectDiary()));
     connect(scopebar, SIGNAL(selectHome()), this, SLOT(selectHome()));
     connect(scopebar, SIGNAL(selectAnal()), this, SLOT(selectAnalysis()));
     connect(scopebar, SIGNAL(selectTrain()), this, SLOT(selectTrain()));
-    connect(scopebar, SIGNAL(showSideBar(bool)), this, SLOT(toggleSidebar()));
-#endif
-
-    // Analysis view buttons too.
-    QHBoxLayout *toolbuttons=new QHBoxLayout;
-    toolbuttons->setSpacing(0);
-    toolbuttons->setContentsMargins(0,0,0,0);
-
-    QIcon saveIcon(":images/oxygen/save.png");
-    saveButton = new QPushButton(saveIcon, "", this);
-    saveButton->setContentsMargins(0,0,0,0);
-    saveButton->setFocusPolicy(Qt::NoFocus);
-    saveButton->setIconSize(QSize(20,20));
-    saveButton->setAutoFillBackground(false);
-    saveButton->setAutoDefault(false);
-    saveButton->setFlat(true);
-    saveButton->setStyleSheet("background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-    saveButton->setAutoRepeat(true);
-    saveButton->setAutoRepeatDelay(200);
-    toolbuttons->addWidget(saveButton);
-    connect(saveButton, SIGNAL(clicked()), this, SLOT(saveRide()));
-
-    QIcon openIcon(":images/oxygen/open.png");
-    QPushButton *open = new QPushButton(openIcon, "", this);
-    open->setFocusPolicy(Qt::NoFocus);
-    open->setIconSize(QSize(20,20));
-    open->setAutoFillBackground(false);
-    open->setAutoDefault(false);
-    open->setFlat(true);
-    open->setStyleSheet("background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-    toolbuttons->addWidget(open);
-    QMenu *openMenu = new QMenu(this);
-    open->setMenu(openMenu);
-    openMenu->addAction(tr("Device Download"), this, SLOT(downloadRide()));
-    openMenu->addAction(tr("Import file"), this, SLOT (importFile()));
-    openMenu->addAction(tr("Manual activity"), this, SLOT(manualRide()));
-
-    toolbuttons->addStretch();
-
-    analButtons = new QWidget(this);
-    analButtons->setContentsMargins(0,0,0,0);
-    analButtons->setFocusPolicy(Qt::NoFocus);
-    analButtons->setAutoFillBackground(false);
-    analButtons->setLayout(toolbuttons);
-    analButtons->show();
-
-    toolbar->addWidget(analButtons);
-    toolbar->addStretch();
-
-    // home
-    QIcon homeIcon(":images/toolbar/main/home.png");
-    homeAct = new QAction(homeIcon, tr("Home"), this);
-    connect(homeAct, SIGNAL(triggered()), this, SLOT(selectHome()));
-    toolbar->addAction(homeAct);
-
-#ifdef GC_HAVE_ICAL
-    // diary
-    QIcon diaryIcon(":images/toolbar/main/diary.png");
-    diaryAct = new QAction(diaryIcon, tr("Diary"), this);
-    connect(diaryAct, SIGNAL(triggered()), this, SLOT(selectDiary()));
-    toolbar->addAction(diaryAct);
-#endif
-
-    // analyse
-    QIcon analysisIcon(":images/toolbar/main/analysis.png");
-    analysisAct = new QAction(analysisIcon, tr("Analysis"), this);
-    connect(analysisAct, SIGNAL(triggered()), this, SLOT(selectAnalysis()));
-    toolbar->addAction(analysisAct);
-
-    // train
-    QIcon trainIcon(":images/toolbar/main/train.png");
-    trainAct = new QAction(trainIcon, tr("Train"), this);
-    connect(trainAct, SIGNAL(triggered()), this, SLOT(selectTrain()));
-    toolbar->addAction(trainAct);
-
-    QWidget *rspacer = new QWidget(this);
-    rspacer->setFixedWidth(100);
-    rspacer->setContentsMargins(0,0,0,0);
-    rspacer->setFocusPolicy(Qt::NoFocus);
-    rspacer->setAutoFillBackground(false);
-    QHBoxLayout *rspacerLayout = new QHBoxLayout(rspacer);
-    rspacerLayout->addStretch();
-    toolbar->addWidget(rspacer);
 
     // add chart button with a menu
     chartMenu = new QMenu(this);
     
-#ifndef Q_OS_MAC
-    QPushButton *newchart = new QPushButton("+", this);
-    rspacerLayout->addWidget(newchart);
-    newchart->setFocusPolicy(Qt::NoFocus);
-    newchart->setAutoFillBackground(false);
-    newchart->setAutoDefault(false);
-    newchart->setFlat(true);
-    newchart->setStyleSheet("color: white; background-color: rgba( 255, 255, 255, 0% ); border: 0px;");
-#else
     QCleanlooksStyle *styler = new QCleanlooksStyle();
     QPushButton *newchart = new QPushButton("+", this);
     scopebar->addWidget(newchart);
@@ -560,7 +530,6 @@ MainWindow::MainWindow(const QDir &home) :
     newchart->setToolTip(tr("Add Chart"));
     newchart->setAutoFillBackground(false);
     newchart->setAutoDefault(false);
-#endif
     newchart->setMenu(chartMenu);
     connect(chartMenu, SIGNAL(aboutToShow()), this, SLOT(setChartMenu()));
     connect(chartMenu, SIGNAL(triggered(QAction*)), this, SLOT(addChart(QAction*)));
@@ -589,17 +558,15 @@ MainWindow::MainWindow(const QDir &home) :
     treeWidget->expandItem(allRides);
     treeWidget->setFirstItemColumnSpanned (allRides, true);
 
-#ifdef GC_HAVE_LUCENE
-    namedSearches = new NamedSearches(home); // must be before navigator
-#endif
-
     // UI Ride List (configurable)
-#ifdef Q_OS_MAC
     listView = new RideNavigator(this, true);
-#else
-    listView = new RideNavigator(this, false);
-#endif
     listView->setProperty("nomenu", true);
+
+    // we need to connect the search box on Linux/Windows
+#if !defined (Q_OS_MAC) && defined (GC_HAVE_LUCENE)
+    connect(searchBox, SIGNAL(searchResults(QStringList)), listView, SLOT(searchStrings(QStringList)));
+    connect(searchBox, SIGNAL(searchClear()), listView, SLOT(clearSearch()));
+#endif
     // retrieve settings (properties are saved when we close the window)
     if (appsettings->cvalue(cyclist, GC_NAVHEADINGS, "").toString() != "") {
         listView->setSortByIndex(appsettings->cvalue(cyclist, GC_SORTBY).toInt());
@@ -623,11 +590,11 @@ MainWindow::MainWindow(const QDir &home) :
     intervalWidget->setContextMenuPolicy(Qt::CustomContextMenu);
     intervalWidget->setFrameStyle(QFrame::NoFrame);
 
-    allIntervals = new QTreeWidgetItem(intervalWidget, FOLDER_TYPE);
+    //allIntervals = new QTreeWidgetItem(intervalWidget, FOLDER_TYPE);
+    allIntervals = intervalWidget->invisibleRootItem();
     allIntervals->setFlags(Qt::ItemIsSelectable | Qt::ItemIsEnabled | Qt::ItemIsDropEnabled);
 
     allIntervals->setText(0, tr("Intervals"));
-    intervalWidget->expandItem(allIntervals);
 
     QWidget *activityHistory = new QWidget(this);
     activityHistory->setContentsMargins(0,0,0,0);
@@ -642,22 +609,33 @@ MainWindow::MainWindow(const QDir &home) :
     intervalSplitter = new QSplitter(this);
     intervalSplitter->setHandleWidth(1);
     intervalSplitter->setOrientation(Qt::Vertical);
-    intervalSplitter->addWidget(activityHistory);
     intervalSplitter->addWidget(intervalWidget);
     intervalSplitter->addWidget(intervalSummaryWindow);
     intervalSplitter->setFrameStyle(QFrame::NoFrame);
+    intervalSplitter->setCollapsible(0, false);
+    intervalSplitter->setCollapsible(1, false);
 
-    QVariant intervalSplitterSizes = appsettings->cvalue(cyclist, GC_SETTINGS_INTERVALSPLITTER_SIZES); 
-    if (intervalSplitterSizes != QVariant()) {
-        intervalSplitter->restoreState(intervalSplitterSizes.toByteArray());
-        intervalSplitter->setOpaqueResize(true); // redraw when released, snappier UI
-    } else {
-        QList<int> sizes;
-        sizes.append(400);
-        sizes.append(200);
-        sizes.append(200);
-        intervalSplitter->setSizes(sizes);
-    }
+    GcSplitterItem *calendarItem = new GcSplitterItem(tr("Calendar"), iconFromPNG(":images/sidebar/calendar.png"), this);
+    gcMultiCalendar = new GcMultiCalendar(this);
+    calendarItem->addWidget(gcMultiCalendar);
+
+    analItem = new GcSplitterItem(tr("Activities"), iconFromPNG(":images/sidebar/folder.png"), this);
+    QAction *moreAnalAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    analItem->addAction(moreAnalAct);
+    connect(moreAnalAct, SIGNAL(triggered(void)), this, SLOT(analysisPopup()));
+    analItem->addWidget(activityHistory);
+
+    intervalItem = new GcSplitterItem(tr("Intervals"), iconFromPNG(":images/mac/stop.png"), this);
+    QAction *moreIntervalAct = new QAction(iconFromPNG(":images/sidebar/extra.png"), tr("Menu"), this);
+    intervalItem->addAction(moreIntervalAct);
+    connect(moreIntervalAct, SIGNAL(triggered(void)), this, SLOT(intervalPopup()));
+    intervalItem->addWidget(intervalSplitter);
+
+    analSidebar = new GcSplitter(Qt::Vertical);
+    analSidebar->addWidget(calendarItem);
+    analSidebar->addWidget(analItem);
+    analSidebar->addWidget(intervalItem);
+    analSidebar->prepare(cyclist, "analysis");
 
     QTreeWidgetItem *last = NULL;
     QStringListIterator i(RideFileFactory::instance().listRideFiles(home));
@@ -678,6 +656,7 @@ MainWindow::MainWindow(const QDir &home) :
     toolBox->setFrameStyle(QFrame::NoFrame);
     toolBox->setContentsMargins(0,0,0,0);
     toolBox->layout()->setSpacing(0);
+    splitter->addWidget(toolBox);
 
     // CONTAINERS FOR TOOLBOX
     masterControls = new QStackedWidget(this);
@@ -754,7 +733,7 @@ MainWindow::MainWindow(const QDir &home) :
     connect(ltmSidebar, SIGNAL(dateRangeChanged(DateRange)), this, SLOT(dateRangeChangedLTM(DateRange)));
     ltmSidebar->dateRangeTreeWidgetSelectionChanged(); // force an update to get first date range shown
 
-    toolBox->addWidget(intervalSplitter);
+    toolBox->addWidget(analSidebar);
     toolBox->addWidget(gcCalendar);
     toolBox->addWidget(trainTool->controls());
     toolBox->addWidget(ltmSidebar);
@@ -787,32 +766,29 @@ MainWindow::MainWindow(const QDir &home) :
     //views->setCurrentIndex(0);
     views->setContentsMargins(0,0,0,0);
 
+    QWidget *sviews = new QWidget(this);
+    sviews->setContentsMargins(0,0,0,0);
+    QVBoxLayout *sviewLayout = new QVBoxLayout(sviews);
+    sviewLayout->setContentsMargins(0,0,0,0);
+    sviewLayout->setSpacing(0);
+    sviewLayout->addWidget(scopebar);
+    sviewLayout->addWidget(views);
+    splitter->addWidget(sviews);
 
-    // SPLITTER
-    splitter->addWidget(toolBox);
-    splitter->addWidget(views);
+    splitter->setStretchFactor(0,0);
+    splitter->setStretchFactor(1,1);
+    splitter->setCollapsible(0, true);
+    splitter->setCollapsible(1, false);
+    splitter->setHandleWidth(1);
+    splitter->setStyleSheet(" QSplitter::handle { background-color: rgb(120,120,120); color: darkGray; }");
+    splitter->setFrameStyle(QFrame::NoFrame);
+    splitter->setContentsMargins(0, 0, 0, 0); // attempting to follow some UI guides
+
     QVariant splitterSizes = appsettings->cvalue(cyclist, GC_SETTINGS_SPLITTER_SIZES); 
     if (splitterSizes.toByteArray().size() > 1 ) {
         splitter->restoreState(splitterSizes.toByteArray());
         splitter->setOpaqueResize(true); // redraw when released, snappier UI
-    } else {
-        QList<int> sizes;
-        sizes.append(150); // narrow as possible
-        sizes.append(390);
-        splitter->setSizes(sizes);
     }
-    splitter->setStretchFactor(0,0);
-    splitter->setStretchFactor(1,1);
-
-    splitter->setChildrenCollapsible(false); // QT BUG crash QTextLayout do not undo this
-    splitter->setHandleWidth(1);
-#ifndef Q_OS_MAC // not on Mac thanks
-    splitter->setStyleSheet(" QSplitter::handle { background-color: #B3B4BA; "
-                            "                     color: #B3B4BA; }");
-#endif
-    splitter->setFrameStyle(QFrame::NoFrame);
-    splitter->setContentsMargins(0, 0, 0, 0); // attempting to follow some UI guides
-
 
     // CENTRAL LAYOUT
     QWidget *central = new QWidget(this);
@@ -821,9 +797,9 @@ MainWindow::MainWindow(const QDir &home) :
     QVBoxLayout *centralLayout = new QVBoxLayout(central);
     centralLayout->setSpacing(0);
     centralLayout->setContentsMargins(0,0,0,0);
-    centralLayout->addWidget(toolbar);
-#ifdef Q_OS_MAC
-    centralLayout->addWidget(scopebar);
+#ifndef Q_OS_MAC // nonmac toolbar on main view -- its not 
+                 // unified with the title bar.
+    centralLayout->addWidget(head);
 #endif
     centralLayout->addWidget(splitter);
 
@@ -832,6 +808,11 @@ MainWindow::MainWindow(const QDir &home) :
     /*----------------------------------------------------------------------
      * Application Menus
      *--------------------------------------------------------------------*/
+#ifdef WIN32
+    menuBar()->setStyleSheet("QMenuBar { background: rgba(225,225,225); }"
+		    	     "QMenuBar::item { background: rgba(225,225,225); }");
+    menuBar()->setContentsMargins(0,0,0,0);
+#endif
 
     QMenu *fileMenu = menuBar()->addMenu(tr("&Athlete"));
     fileMenu->addAction(tr("&New..."), this, SLOT(newCyclist()), tr("Ctrl+N"));
@@ -856,6 +837,7 @@ MainWindow::MainWindow(const QDir &home) :
     stravaAction = new QAction(tr("Upload to Strava..."), this);
     connect(stravaAction, SIGNAL(triggered(bool)), this, SLOT(uploadStrava()));
     rideMenu->addAction(stravaAction);
+    rideMenu->addAction(tr("Download from Strava..."), this, SLOT(downloadStrava()));
 
     rideWithGPSAction = new QAction(tr("Upload to RideWithGPS..."), this);
     connect(rideWithGPSAction, SIGNAL(triggered(bool)), this, SLOT(uploadRideWithGPSAction()));
@@ -927,7 +909,7 @@ MainWindow::MainWindow(const QDir &home) :
     showhideSidebar->setCheckable(true);
     showhideSidebar->setChecked(true);
 #ifndef Q_OS_MAC // not on a Mac
-    showhideToolbar = viewMenu->addAction(tr("Show Toolbar"), this, SLOT(showToolbar(bool)));
+    QAction *showhideToolbar = viewMenu->addAction(tr("Show Toolbar"), this, SLOT(showToolbar(bool)));
     showhideToolbar->setCheckable(true);
     showhideToolbar->setChecked(true);
 #endif
@@ -975,10 +957,10 @@ MainWindow::MainWindow(const QDir &home) :
     connect(intervalWidget,SIGNAL(itemSelectionChanged()), this, SLOT(intervalTreeWidgetSelectionChanged()));
     connect(intervalWidget,SIGNAL(itemChanged(QTreeWidgetItem *,int)), this, SLOT(intervalEdited(QTreeWidgetItem*, int)));
     connect(splitter,SIGNAL(splitterMoved(int,int)), this, SLOT(splitterMoved(int,int)));
-    connect(intervalSplitter,SIGNAL(splitterMoved(int,int)), this, SLOT(intervalSplitterMoved(int,int)));
 
-    connect(this, SIGNAL(rideDirty()), this, SLOT(enableSaveButton()));
-    connect(this, SIGNAL(rideClean()), this, SLOT(enableSaveButton()));
+    // We really do need a mechanism for showing if a ride needs saving...
+    //connect(this, SIGNAL(rideDirty()), this, SLOT(enableSaveButton()));
+    //connect(this, SIGNAL(rideClean()), this, SLOT(enableSaveButton()));
 
     // cpx aggregate cache check
     connect(this,SIGNAL(rideAdded(RideItem*)),this,SLOT(checkCPX(RideItem*)));
@@ -994,9 +976,6 @@ MainWindow::MainWindow(const QDir &home) :
     // Kick off
     rideTreeWidgetSelectionChanged();
     selectAnalysis();
-#ifdef Q_OS_MAC
-    scopebar->setShowSidebar(true);
-#endif
     setStyle();
 }
 
@@ -1005,34 +984,38 @@ MainWindow::MainWindow(const QDir &home) :
  *--------------------------------------------------------------------*/
 
 void
-MainWindow::showDock()
-{
-    dock->toggleViewAction()->activate(QAction::Trigger);
-}
-
-void
 MainWindow::toggleSidebar()
 {
     showSidebar(!toolBox->isVisible());
+#ifdef Q_OS_MAC
+    sidebar->setSelected(toolBox->isVisible());
+#endif
 }
 
 void
 MainWindow::showSidebar(bool want)
 {
-    static const QIcon hideIcon(":images/toolbar/main/hideside.png");
-    static const QIcon showIcon(":images/toolbar/main/showside.png");
-
     if (want) {
+
         toolBox->show();
-        side->setIcon(hideIcon);
+
+        // if it was collapsed we need set to at least 200
+        // unless the mainwindow isn't big enough
+        if (toolBox->width()<10) {
+            int size = width() - 200;
+            if (size>200) size = 200;
+
+            QList<int> sizes;
+            sizes.append(size);
+            sizes.append(width()-size);
+            splitter->setSizes(sizes);
+        }
+
     } else {
+
         toolBox->hide();
-        side->setIcon(showIcon);
     }
     showhideSidebar->setChecked(toolBox->isVisible());
-#ifdef Q_OS_MAC
-    scopebar->setShowSidebar(toolBox->isVisible());
-#endif
     setStyle();
 
 }
@@ -1040,8 +1023,8 @@ MainWindow::showSidebar(bool want)
 void
 MainWindow::showToolbar(bool want)
 {
-    if (want) toolbar->show();
-    else toolbar->hide();
+    if (want) head->show();
+    else head->hide();
 }
 
 void
@@ -1147,6 +1130,14 @@ MainWindow::selectWindow(QAction *act)
 }
 
 void
+MainWindow::setStyleFromSegment(int segment)
+{
+    if (!currentWindow) return;
+    currentWindow->setStyle(segment ? 2 : 0);
+    styleAction->setChecked(!segment);
+}
+
+void
 MainWindow::toggleStyle()
 {
     if (!currentWindow) return;
@@ -1197,8 +1188,7 @@ MainWindow::rideTreeWidgetSelectionChanged()
     diaryWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     trainWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     gcCalendar->setRide(ride);
-
-    enableSaveButton(); // should it be enabled or not?
+    gcMultiCalendar->setRide(ride);
 
     if (!ride) return;
 
@@ -1250,15 +1240,10 @@ MainWindow::dateRangeChangedLTM(DateRange dr)
 }
 
 void
-MainWindow::enableSaveButton()
+MainWindow::analysisPopup()
 {
-    if (!ride) {
-        saveButton->setEnabled(false);
-        return;
-    }
-
-    if (ride->isDirty()) saveButton->setEnabled(true);
-    else saveButton->setEnabled(false);
+    // set the point for the menu and call below
+    showTreeContextMenuPopup(analSidebar->mapToGlobal(QPoint(analItem->pos().x()+analItem->width()-20, analItem->pos().y())));
 }
 
 void
@@ -1280,12 +1265,6 @@ MainWindow::showTreeContextMenuPopup(const QPoint &pos)
         QAction *actDeleteRide = new QAction(tr("Delete Activity"), treeWidget);
         connect(actDeleteRide, SIGNAL(triggered(void)), this, SLOT(deleteRide()));
 
-        QAction *actBestInt = new QAction(tr("Find Best Intervals"), treeWidget);
-        connect(actBestInt, SIGNAL(triggered(void)), this, SLOT(addIntervals()));
-
-        QAction *actPowerPeaks = new QAction(tr("Find Power Peaks"), treeWidget);
-        connect(actPowerPeaks, SIGNAL(triggered(void)), this, SLOT(findPowerPeaks()));
-
         QAction *actSplitRide = new QAction(tr("Split Activity"), treeWidget);
         connect(actSplitRide, SIGNAL(triggered(void)), this, SLOT(splitRide()));
 
@@ -1295,8 +1274,6 @@ MainWindow::showTreeContextMenuPopup(const QPoint &pos)
         }
 
         menu.addAction(actDeleteRide);
-        menu.addAction(actBestInt);
-        menu.addAction(actPowerPeaks);
         menu.addAction(actSplitRide);
 #ifdef GC_HAVE_LIBOAUTH
         QAction *actTweetRide = new QAction(tr("Tweet Activity"), treeWidget);
@@ -1308,8 +1285,100 @@ MainWindow::showTreeContextMenuPopup(const QPoint &pos)
         connect(actUploadCalendar, SIGNAL(triggered(void)), this, SLOT(uploadCalendar()));
         menu.addAction(actUploadCalendar);
 #endif
+        menu.addSeparator();
+
+        // ride navigator stuff
+        QAction *colChooser = new QAction(tr("Show Column Chooser"), treeWidget);
+        connect(colChooser, SIGNAL(triggered(void)), listView, SLOT(showColumnChooser()));
+        menu.addAction(colChooser);
+
+        if (listView->groupBy() >= 0) {
+
+            // already grouped lets ungroup
+            QAction *nogroups = new QAction(tr("Do Not Show In Groups"), treeWidget);
+            connect(nogroups, SIGNAL(triggered(void)), listView, SLOT(noGroups()));
+            menu.addAction(nogroups);
+
+        } else {
+
+            QMenu *groupByMenu = new QMenu(tr("Group By"), treeWidget);
+            groupByMenu->setEnabled(true);
+            menu.addMenu(groupByMenu);
+
+            // add menu options for each column
+            if (groupByMapper) delete groupByMapper;
+            groupByMapper = new QSignalMapper(this);
+            connect(groupByMapper, SIGNAL(mapped(const QString &)), listView, SLOT(setGroupByColumnName(QString)));
+
+            foreach(QString heading, listView->columnNames()) {
+                if (heading == "*") continue; // special hidden column
+
+                QAction *groupByAct = new QAction(heading, treeWidget);
+                connect(groupByAct, SIGNAL(triggered()), groupByMapper, SLOT(map()));
+                groupByMenu->addAction(groupByAct);
+
+                // map action to column heading
+                groupByMapper->setMapping(groupByAct, heading);
+            }
+        }
         menu.exec(pos);
     }
+}
+
+void
+MainWindow::intervalPopup()
+{
+    // always show the 'find best' 'find peaks' options
+    QMenu menu(intervalItem);
+
+    RideItem *rideItem = (RideItem *)treeWidget->selectedItems().first();
+
+    if (rideItem != NULL && rideItem->ride() && rideItem->ride()->dataPoints().count()) {
+        QAction *actFindPeak = new QAction(tr("Find Peak Intervals"), intervalItem);
+        QAction *actFindBest = new QAction(tr("Find Best Intervals"), intervalItem);
+        connect(actFindPeak, SIGNAL(triggered(void)), this, SLOT(findPowerPeaks(void)));
+        connect(actFindBest, SIGNAL(triggered(void)), this, SLOT(addIntervals(void)));
+        menu.addAction(actFindPeak);
+        menu.addAction(actFindBest);
+
+        // sort but only if 2 or more intervals
+        if (allIntervals->childCount() > 1) {
+            QAction *actSort = new QAction(tr("Sort Intervals"), intervalItem);
+            connect(actSort, SIGNAL(triggered(void)), this, SLOT(sortIntervals(void)));
+            menu.addAction(actSort);
+        }
+
+        if (intervalWidget->selectedItems().count()) menu.addSeparator();
+    }
+
+
+    if (intervalWidget->selectedItems().count() == 1) {
+
+        // we can zoom, rename etc if only 1 interval is selected
+        QAction *actZoomInt = new QAction(tr("Zoom to interval"), intervalWidget);
+        QAction *actEditInt = new QAction(tr("Edit interval"), intervalWidget);
+        QAction *actDeleteInt = new QAction(tr("Delete interval"), intervalWidget);
+
+        connect(actZoomInt, SIGNAL(triggered(void)), this, SLOT(zoomIntervalSelected(void)));
+        connect(actEditInt, SIGNAL(triggered(void)), this, SLOT(editIntervalSelected(void)));
+        connect(actDeleteInt, SIGNAL(triggered(void)), this, SLOT(deleteIntervalSelected(void)));
+
+        menu.addAction(actZoomInt);
+        menu.addAction(actEditInt);
+        menu.addAction(actDeleteInt);
+    }
+
+    if (intervalWidget->selectedItems().count() > 1) {
+        QAction *actRenameInt = new QAction(tr("Rename selected intervals"), intervalWidget);
+        connect(actRenameInt, SIGNAL(triggered(void)), this, SLOT(renameIntervalsSelected(void)));
+        QAction *actDeleteInt = new QAction(tr("Delete selected intervals"), intervalWidget);
+        connect(actDeleteInt, SIGNAL(triggered(void)), this, SLOT(deleteIntervalSelected(void)));
+
+        menu.addAction(actRenameInt);
+        menu.addAction(actDeleteInt);
+    }
+
+    menu.exec(analSidebar->mapToGlobal((QPoint(intervalItem->pos().x()+intervalItem->width()-20, intervalItem->pos().y()))));
 }
 
 void
@@ -1321,19 +1390,19 @@ MainWindow::showContextMenuPopup(const QPoint &pos)
 
         activeInterval = (IntervalItem *)trItem;
 
-        QAction *actRenameInt = new QAction(tr("Rename interval"), intervalWidget);
+        QAction *actEditInt = new QAction(tr("Edit interval"), intervalWidget);
         QAction *actDeleteInt = new QAction(tr("Delete interval"), intervalWidget);
         QAction *actZoomInt = new QAction(tr("Zoom to interval"), intervalWidget);
         QAction *actFrontInt = new QAction(tr("Bring to Front"), intervalWidget);
         QAction *actBackInt = new QAction(tr("Send to back"), intervalWidget);
-        connect(actRenameInt, SIGNAL(triggered(void)), this, SLOT(renameInterval(void)));
+        connect(actEditInt, SIGNAL(triggered(void)), this, SLOT(editInterval(void)));
         connect(actDeleteInt, SIGNAL(triggered(void)), this, SLOT(deleteInterval(void)));
         connect(actZoomInt, SIGNAL(triggered(void)), this, SLOT(zoomInterval(void)));
         connect(actFrontInt, SIGNAL(triggered(void)), this, SLOT(frontInterval(void)));
         connect(actBackInt, SIGNAL(triggered(void)), this, SLOT(backInterval(void)));
 
         menu.addAction(actZoomInt);
-        menu.addAction(actRenameInt);
+        menu.addAction(actEditInt);
         menu.addAction(actDeleteInt);
         menu.exec(intervalWidget->mapToGlobal( pos ));
     }
@@ -1350,14 +1419,11 @@ MainWindow::resizeEvent(QResizeEvent*)
 }
 
 void
-MainWindow::intervalSplitterMoved(int /* pos */, int /*index*/)
-{
-    appsettings->setCValue(cyclist, GC_SETTINGS_INTERVALSPLITTER_SIZES, intervalSplitter->saveState());
-}
-
-void
 MainWindow::splitterMoved(int pos, int /*index*/)
 {
+    // show / hide sidebar as dragged..
+    if ((pos == 0  && toolBox->isVisible()) || (pos>10 && !toolBox->isVisible())) toggleSidebar();
+
     listView->setWidth(pos);
     appsettings->setCValue(cyclist, GC_SETTINGS_SPLITTER_SIZES, splitter->saveState());
 }
@@ -1575,34 +1641,17 @@ MainWindow::selectAnalysis()
     if (allRides->childCount() == 0 && showBlankAnal == true) {
         masterControls->setVisible(false);
         toolBox->hide();
-#ifndef Q_OS_MAC
-        side->setEnabled(false);
-#else
-        scopebar->setEnabledHideButton(false);
-#endif
         views->setCurrentWidget(blankStateAnalysisPage);
     } else {
         masterControls->setVisible(true);
-        toolBox->show();
-#ifndef Q_OS_MAC
-        side->setEnabled(true);
-#else
-        scopebar->setEnabledHideButton(true);
-#endif
-		this->showSidebar(true);
         masterControls->setCurrentIndex(0);
         views->setCurrentIndex(0);
         analWindow->selected(); // tell it!
         trainTool->getToolbarButtons()->hide();
-#ifndef Q_OS_MAC
-    analButtons->show();
 #ifdef GC_HAVE_ICAL
-    toolbar->select(2);
-#else
-    toolbar->select(1);
-#endif
-#else
         scopebar->selected(2);
+#else
+        scopebar->selected(1);
 #endif
         toolBox->setCurrentIndex(0);
     }
@@ -1618,35 +1667,19 @@ MainWindow::selectTrain()
     if ((appsettings->value(this, GC_DEV_COUNT) == 0 || trainDB->getCount() <= 2) && showBlankTrain == true) {
         masterControls->setVisible(false);
         toolBox->hide();
-#ifndef Q_OS_MAC
-        side->setEnabled(false);
-#else
-        scopebar->setEnabledHideButton(false);
-#endif
         views->setCurrentWidget(blankStateTrainPage);
     } else {
         masterControls->setVisible(true);
-        toolBox->show();
-#ifndef Q_OS_MAC
-        side->setEnabled(true);
-#else
-        scopebar->setEnabledHideButton(true);
-#endif
-		this->showSidebar(true);
+		//this->showSidebar(true);
         masterControls->setCurrentIndex(1);
         views->setCurrentIndex(1);
         trainWindow->selected(); // tell it!
         trainTool->getToolbarButtons()->show();
-    #ifndef Q_OS_MAC
-        analButtons->hide();
-    #ifdef GC_HAVE_ICAL
-        toolbar->select(3);
-    #else
-        toolbar->select(2);
-    #endif
-    #else
+#ifdef GC_HAVE_ICAL
         scopebar->selected(3);
-    #endif
+#else
+        scopebar->selected(2);
+#endif
         toolBox->setCurrentIndex(2);
     }
     currentWindow = trainWindow;
@@ -1659,31 +1692,15 @@ MainWindow::selectDiary()
     if (allRides->childCount() == 0 && showBlankDiary == true) {
         masterControls->setVisible(false);
         toolBox->hide();
-#ifndef Q_OS_MAC
-        side->setEnabled(false);
-#else
-        scopebar->setEnabledHideButton(false);
-#endif
         views->setCurrentWidget(blankStateDiaryPage);
     } else {
         masterControls->setVisible(true);
-        toolBox->show();
-#ifndef Q_OS_MAC
-        side->setEnabled(true);
-#else
-        scopebar->setEnabledHideButton(true);
-#endif
-		this->showSidebar(true);
+		//this->showSidebar(true);
         masterControls->setCurrentIndex(2);
         views->setCurrentIndex(2);
         diaryWindow->selected(); // tell it!
         trainTool->getToolbarButtons()->hide();
-    #ifndef Q_OS_MAC
-        analButtons->hide();
-        toolbar->select(1);
-    #else
         scopebar->selected(1);
-    #endif
         toolBox->setCurrentIndex(1);
         gcCalendar->refresh(); // get that signal with the date range...
     }
@@ -1698,53 +1715,32 @@ MainWindow::selectHome()
     if (allRides->childCount() == 0 && showBlankHome == true) {
         masterControls->setVisible(false);
         toolBox->hide();
-#ifndef Q_OS_MAC
-        side->setEnabled(false);
-#else
-        scopebar->setEnabledHideButton(false);
-#endif
         views->setCurrentWidget(blankStateHomePage);
     } else {
         masterControls->setVisible(true);
-        toolBox->show();
-#ifndef Q_OS_MAC
-        side->setEnabled(true);
-#else
-        scopebar->setEnabledHideButton(true);
-#endif
-		this->showSidebar(true);
+        //toolBox->show();
+		//this->showSidebar(true);
         masterControls->setCurrentIndex(3);
         views->setCurrentIndex(3);
         homeWindow->selected(); // tell it!
         trainTool->getToolbarButtons()->hide();
-    #ifndef Q_OS_MAC
-        analButtons->hide();
-        toolbar->select(0);
-    #else
         scopebar->selected(0);
-    #endif
         toolBox->setCurrentIndex(3);
     }
     currentWindow = homeWindow;
     setStyle();
 }
-void
-MainWindow::selectAthlete()
-{
-}
 
 void
 MainWindow::setStyle()
 {
-    static const QIcon tabIcon(":images/toolbar/main/tab.png");
-    static const QIcon tileIcon(":images/toolbar/main/tile.png");
+    int select = currentWindow->currentStyle == 0 ? 0 : 1;
 
-    if (!currentWindow) return;
-
-    styleAction->setChecked(currentWindow->currentStyle == 0);
-    style->setIcon((currentWindow->currentStyle == 0) ? tileIcon : tabIcon);
 #ifdef Q_OS_MAC
-    styleSelector->setSelected(currentWindow->currentStyle == 0 ? 0 : 1, true);
+    styleSelector->setSelected(select, true);
+#else
+    if (styleSelector->isSegmentSelected(select) == false)
+        styleSelector->setSegmentSelected(select, true);
 #endif
 }
 
@@ -2002,9 +1998,7 @@ MainWindow::importFile()
     foreach(QString suffix, rff.suffixes())
         allFormats << QString("%1 (*.%2)").arg(rff.description(suffix)).arg(suffix);
     allFormats << "All files (*.*)";
-    fileNames = QFileDialog::getOpenFileNames(
-        this, tr("Import from File"), lastDir,
-        allFormats.join(";;"));
+    fileNames = QFileDialog::getOpenFileNames( this, tr("Import from File"), lastDir, allFormats.join(";;"));
     if (!fileNames.isEmpty()) {
         lastDir = QFileInfo(fileNames.front()).absolutePath();
         appsettings->setValue(GC_SETTINGS_LAST_IMPORT_PATH, lastDir);
@@ -2126,8 +2120,7 @@ MainWindow::openCyclist()
 void
 MainWindow::exportMetrics()
 {
-    QString fileName = QFileDialog::getSaveFileName(
-        this, tr("Export Metrics"), QDir::homePath(), tr("Comma Separated Variables (*.csv)"));
+    QString fileName = QFileDialog::getSaveFileName( this, tr("Export Metrics"), QDir::homePath(), tr("Comma Separated Variables (*.csv)"));
     if (fileName.length() == 0)
         return;
     metricDB->writeAsCSV(fileName);
@@ -2146,9 +2139,16 @@ MainWindow::uploadStrava()
     RideItem *item = dynamic_cast<RideItem*>(_item);
 
     if (item) { // menu is disabled anyway, but belt and braces
-        StravaDialog d(this, item);
+        StravaUploadDialog d(this, item);
         d.exec();
     }
+}
+
+void
+MainWindow::downloadStrava()
+{
+    StravaDownloadDialog d(this);
+    d.exec();
 }
 
 /*----------------------------------------------------------------------
@@ -2201,8 +2201,7 @@ MainWindow::importWorkout()
     // anything for now, we could add filters later
     QStringList allFormats;
     allFormats << "All files (*.*)";
-    QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import from File"), lastDir,
-                                                                          allFormats.join(";;"));
+    QStringList fileNames = QFileDialog::getOpenFileNames(this, tr("Import from File"), lastDir, allFormats.join(";;"));
 
     // lets process them 
     if (!fileNames.isEmpty()) {
@@ -2367,23 +2366,110 @@ MainWindow::updateRideFileIntervals()
     which->setDirty(true);
 }
 
+bool
+lessItem(const IntervalItem *s1, const IntervalItem *s2) {
+    return s1->start < s2->start;
+}
+
+void
+MainWindow::sortIntervals()
+{
+    // sort them chronologically
+    QList<IntervalItem*> intervals;
+
+    // set string to first interval selected
+    for (int i=0; i<allIntervals->childCount();i++)
+        intervals.append((IntervalItem*)(allIntervals->child(i)));
+
+    // now sort them into start time order
+    qStableSort(intervals.begin(), intervals.end(), lessItem);
+
+    // empty allIntervals
+    allIntervals->takeChildren();
+
+    // and put em back in chronological sequence
+    foreach(IntervalItem* item, intervals) {
+        allIntervals->addChild(item);
+    }
+
+    // now update the ridefile
+    updateRideFileIntervals(); // will emit intervalChanged() signal
+}
+
+// rename multiple intervals
+void
+MainWindow::renameIntervalsSelected()
+{
+    QString string;
+
+    // set string to first interval selected
+    for (int i=0; i<allIntervals->childCount();i++) {
+        if (allIntervals->child(i)->isSelected()) {
+            string = allIntervals->child(i)->text(0);
+            break;
+        }
+    }
+
+    // type in a name and we will renumber all the intervals
+    // in the same fashion -- esp if the last characters are
+    RenameIntervalDialog dialog(string, this);
+    dialog.setFixedWidth(320);
+
+    if (dialog.exec()) {
+
+        int number = 1;
+
+        // does it end in a number?
+        // if so we use that to renumber from
+        QRegExp ends("^(.*[^0-9])([0-9]+)$");
+        if (ends.exactMatch(string)) {
+
+            string = ends.cap(1);
+            number = ends.cap(2).toInt();
+
+        } else if (!string.endsWith(" ")) string += " ";
+
+        // now go and renumber from 'number' with prefix 'string'
+        for (int i=0; i<allIntervals->childCount();i++) {
+            if (allIntervals->child(i)->isSelected())
+                allIntervals->child(i)->setText(0, QString("%1%2").arg(string).arg(number++));
+        }
+
+        updateRideFileIntervals(); // will emit intervalChanged() signal
+    }
+}
+
+void
+MainWindow::deleteIntervalSelected()
+{
+    // delete the intervals that are selected (from the menu)
+    // the normal delete intervals does that already
+    deleteInterval();
+}
+
 void
 MainWindow::deleteInterval()
 {
-    // renumber remaining
-    int oindex = activeInterval->displaySequence;
-    for (int i=0; i<allIntervals->childCount(); i++) {
-        IntervalItem *it = (IntervalItem *)allIntervals->child(i);
-        int ds = it->displaySequence;
-        if (ds > oindex) it->setDisplaySequence(ds-1);
-    }
-
     // now delete highlighted!
     for (int i=0; i<allIntervals->childCount();) {
         if (allIntervals->child(i)->isSelected()) delete allIntervals->takeChild(i);
         else i++;
     }
 
+    updateRideFileIntervals(); // will emit intervalChanged() signal
+}
+
+void
+MainWindow::renameIntervalSelected()
+{
+    // go edit the name
+    for (int i=0; i<allIntervals->childCount();) {
+        if (allIntervals->child(i)->isSelected()) {
+            allIntervals->child(i)->setFlags(allIntervals->child(i)->flags() | Qt::ItemIsEditable);
+            intervalWidget->editItem(allIntervals->child(i), 0);
+            break;
+        } else i++;
+    }
     updateRideFileIntervals(); // will emit intervalChanged() signal
 }
 
@@ -2395,9 +2481,46 @@ MainWindow::renameInterval() {
 }
 
 void
+MainWindow::editIntervalSelected()
+{
+    // go edit the interval
+    for (int i=0; i<allIntervals->childCount();) {
+        if (allIntervals->child(i)->isSelected()) {
+            activeInterval = (IntervalItem*)allIntervals->child(i);
+            editInterval();
+            break;
+        } else i++;
+    }
+}
+
+void
+MainWindow::editInterval()
+{
+    IntervalItem temp = *activeInterval;
+    EditIntervalDialog dialog(this, temp);
+
+    if (dialog.exec()) {
+        *activeInterval = temp;
+        updateRideFileIntervals(); // will emit intervalChanged() signal
+    }
+}
+
+void
 MainWindow::intervalEdited(QTreeWidgetItem *, int) {
     // the user renamed the interval
     updateRideFileIntervals(); // will emit intervalChanged() signal
+}
+
+void
+MainWindow::zoomIntervalSelected()
+{
+    // zoom the one interval that is selected via popup menu
+    for (int i=0; i<allIntervals->childCount();) {
+        if (allIntervals->child(i)->isSelected()) {
+            emit intervalZoom((IntervalItem*)(allIntervals->child(i)));
+            break;
+        } else i++;
+    }
 }
 
 void
@@ -2580,11 +2703,11 @@ MainWindow::exportMeasures()
     start.fromTime_t(0);
 
     foreach (SummaryMetrics x, metricDB->db()->getAllMeasuresFor(start, end)) {
-qDebug()<<x.getDateTime();
-qDebug()<<x.getText("Weight", "0.0").toDouble();
-qDebug()<<x.getText("Lean Mass", "0.0").toDouble();
-qDebug()<<x.getText("Fat Mass", "0.0").toDouble();
-qDebug()<<x.getText("Fat Ratio", "0.0").toDouble();
+//qDebug()<<x.getDateTime();
+//qDebug()<<x.getText("Weight", "0.0").toDouble();
+//qDebug()<<x.getText("Lean Mass", "0.0").toDouble();
+//qDebug()<<x.getText("Fat Mass", "0.0").toDouble();
+//qDebug()<<x.getText("Fat Ratio", "0.0").toDouble();
     }
 }
 
@@ -2656,6 +2779,7 @@ MainWindow::searchTextChanged(QString text)
     }
 #endif
 }
+#endif
 void
 MainWindow::actionClicked(int index)
 {
@@ -2673,4 +2797,3 @@ MainWindow::actionClicked(int index)
 
     }
 }
-#endif

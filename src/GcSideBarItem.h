@@ -23,68 +23,143 @@
 #include <QList>
 #include <QAction>
 
-class GcSideBarItem;
+class GcSubSplitter;
+class GcSplitterControl;
+class GcSplitterItem;
+class GcLabel;
 
-class GcSideBarTitle : public QWidget
+class GcSplitter : public QWidget
 {
     Q_OBJECT
 
 public:
+    GcSplitter(Qt::Orientation orientation, QWidget *parent = 0);
 
-    GcSideBarTitle(QString title,GcSideBarItem *parent);
-    ~GcSideBarTitle();
+    void addWidget(QWidget *widget);
+    void insertWidget(int index, QWidget *widget);
 
-    void addAction(QAction *action);
+    void setOpaqueResize(bool opaque = true);
+    QList<int> sizes() const;
+    void setSizes(const QList<int> &list);
 
-public slots:
-    void paintEvent (QPaintEvent *event);
+    QByteArray saveState() const;
+    bool restoreState(const QByteArray &state);
 
-    void showHideClicked();
-
-    void setExpanded(bool expanded);
+    void prepare(QString cyclist, QString name); // get ready for first show, you're now configured
+                                // I'm gonna call you "name" -- which is used to
+                                // save and restore state
 
 signals:
-    void showSideBar(bool);
+    void splitterMoved(int pos, int index);
 
-    void addChart();
+public slots:
+    void subSplitterMoved(int pos, int index);
+    void saveSettings();
+
+private:
+    GcSubSplitter *splitter;
+    GcSplitterControl *control;
+    QString cyclist, name;
+};
+
+class GcSubSplitter : public QSplitter
+{
+    Q_OBJECT
+
+public:
+    GcSubSplitter(Qt::Orientation orientation, GcSplitterControl *control, GcSplitter *parent);
+
+    void addWidget(QWidget *widget);
+    void insertWidget(int index, QWidget *widget);
+
+protected:
+    QSplitterHandle *createHandle();
+
+private:
+    QList<QString> titles;
+    QWidget * _insertedWidget;
+
+    GcSplitterControl *control;
+    GcSplitter *gcSplitter;
+
+};
+
+class GcSplitterHandle : public QSplitterHandle
+{
+    Q_OBJECT
+
+    friend class ::GcSplitterItem;
+
+public:
+    GcSplitterHandle(QString title, GcSplitterItem *widget, Qt::Orientation orientation, GcSubSplitter *parent = 0);
+
+    QSize sizeHint() const;
+    GcSubSplitter *splitter() const;
+    void addAction(QAction *action);
+    void addActions(QList<QAction*> actions);
+
+protected:
+    void paintEvent(QPaintEvent *);
+    GcSubSplitter *gcSplitter;
+    int index;
 
 private:
     void paintBackground(QPaintEvent *);
 
-    GcSideBarItem *parent;
+    GcSplitterItem *widget;
 
     QHBoxLayout *titleLayout;
-    QLabel *titleLabel;
+    GcLabel *titleLabel;
     QToolBar *titleToolbar;
-    QPushButton *showHide;
 
+    QString title;
     int fullHeight;
+    QLinearGradient active, inactive;
 };
 
-class GcSideBarItem : public QWidget
+class GcSplitterControl : public QToolBar
+{
+    Q_OBJECT
+
+public:
+    GcSplitterControl(QWidget *parent);
+    void selectAction();
+
+protected:
+    void paintEvent(QPaintEvent *);
+
+private:
+    void paintBackground(QPaintEvent *);
+    QLinearGradient active, inactive;
+
+};
+
+class GcSplitterItem : public QWidget
 {
     Q_OBJECT
 
 public:
 
-    GcSideBarItem(QString title, QWidget *parent);
-    ~GcSideBarItem();
-
-    void addAction(QAction *action);
+    GcSplitterItem(QString title, QIcon icon, QWidget *parent);
+    ~GcSplitterItem();
 
     QWidget *content;
+    GcSplitterHandle *splitterHandle;
 
     bool state;
+    QString title;
+    QIcon icon;
+    QAction *controlAction;
 
 public slots:
 
     void addWidget(QWidget*);
+    void selectHandle();
 
 private:
     QVBoxLayout *layout;
 
-    GcSideBarTitle *titleBar;
-
 };
 
+extern QIcon iconFromPNG(QString filename);
 #endif
