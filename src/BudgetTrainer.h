@@ -67,9 +67,8 @@
 #define BT_LOAD           50.00
 #define BT_GRADIENT       0.00
 
-//#define BT_MESSAGE_SIZE   16
-#define BT_REQUEST_SIZE 16
-#define BT_RESPONSE_SIZE 6
+#define BT_REQUEST_SIZE   16
+#define BT_RESPONSE_SIZE  8
 
 
 class BudgetTrainer : public QThread

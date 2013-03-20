@@ -52,6 +52,8 @@
 // 3             Target motor position (1 to 100)
 // 4             Current motor position (1 to 100)
 // 5             0x00 -- UNUSED
+// 6             0x00 -- UNUSED
+// 7             0x00 -- UNUSED
 
 
 
