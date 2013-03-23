@@ -547,11 +547,6 @@ GcMiniCalendar::GcMiniCalendar(MainWindow *main, bool master) : main(main), mast
     // day clicked
     connect(signalMapper, SIGNAL(mapped(int)), this, SLOT(dayClicked(int)));
 
-    // refresh on these events...XXX multi controls now!
-    //connect(main, SIGNAL(rideAdded(RideItem*)), this, SLOT(refresh()));
-    //connect(main, SIGNAL(rideDeleted(RideItem*)), this, SLOT(refresh()));
-    //connect(main, SIGNAL(configChanged()), this, SLOT(refresh()));
-
     // set up for current selections
     refresh();
 }
@@ -559,8 +554,7 @@ GcMiniCalendar::GcMiniCalendar(MainWindow *main, bool master) : main(main), mast
 void
 GcMiniCalendar::refresh()
 {
-    calendarModel->setMonth(month, year);
-    repaint();
+    setDate(month, year);
 }
 
 bool
@@ -641,7 +635,6 @@ GcMiniCalendar::previous()
             month = date.month();
             year = date.year();
             calendarModel->setMonth(date.month(), date.year());
-            emit dateChanged(month,year);
 
             // find the day in the calendar...
             for (int day=42; day>0;day--) {
@@ -654,6 +647,7 @@ GcMiniCalendar::previous()
                     if (files.count()) main->selectRideFile(QFileInfo(files[0]).fileName());
                 }
             }
+            emit dateChanged(month,year);
             break;
         }
     }
@@ -674,7 +668,6 @@ GcMiniCalendar::next()
             month = date.month();
             year = date.year();
             calendarModel->setMonth(date.month(), date.year());
-            emit dateChanged(month,year);
 
             // find the day in the calendar...
             for (int day=0; day<42;day++) {
@@ -687,6 +680,7 @@ GcMiniCalendar::next()
                     if (files.count()) main->selectRideFile(QFileInfo(files[0]).fileName());
                 }
             }
+            emit dateChanged(month,year);
             break;
         }
     }
@@ -765,7 +759,6 @@ GcMiniCalendar::setDate(int _month, int _year)
             }
         }
     }
-    refresh();
 }
 
 //********************************************************************************
@@ -890,5 +883,9 @@ GcMultiCalendar::setRide(RideItem *ride)
 void
 GcMultiCalendar::refresh()
 {
-    for(int i=0; i<showing; i++) calendars.at(i)->refresh();
+    setUpdatesEnabled(false);
+    for(int i=0; i<showing; i++) {
+        calendars.at(i)->refresh();
+    }
+    setUpdatesEnabled(true);
 }
