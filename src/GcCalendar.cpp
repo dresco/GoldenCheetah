@@ -17,6 +17,7 @@
  */
 
 #include "GcCalendar.h"
+#include "GcWindowLayout.h"
 #include "Settings.h"
 #include <QWebSettings>
 #include <QWebFrame>
@@ -164,7 +165,10 @@ GcLabel::paintEvent(QPaintEvent *)
 
         // setup a painter and the area to paint
         if (!underMouse()) painter.fillRect(all, bgColor);
-        else painter.fillRect(all, Qt::lightGray);
+        else {
+            if (filtered) painter.fillRect(all, QColor(0.4 *255,0.6*255,0.77*255,60));
+            else painter.fillRect(all, Qt::lightGray);
+        }
 
         painter.setPen(Qt::gray);
         painter.drawRect(QRect(0,0,width(),height()));
@@ -185,7 +189,9 @@ GcLabel::paintEvent(QPaintEvent *)
             painter.drawText(off, alignment(), text());
         }
 
-        painter.setPen(QColor(0,0,0,170));
+        if (filtered) painter.setPen(QColor(0.4*255,0.6*255,0.7*255,255));
+        else painter.setPen(QColor(0,0,0,170));
+
         painter.drawText(norm, alignment(), text());
     } else {
 
@@ -196,6 +202,13 @@ GcLabel::paintEvent(QPaintEvent *)
         icon.paint(&painter, all, alignment|Qt::AlignVCenter);
     }
 
+    if (text() != ""  && filtered) {
+        QPen pen;
+        pen.setColor(QColor(0.4*255,0.6*255,0.77*255,255));
+        pen.setWidth(3);
+        painter.setPen(pen);
+        painter.drawRect(QRect(0,0,width(),height()));
+    }
     painter.restore();
 }
 
@@ -262,8 +275,7 @@ GcCalendar::setSummary()
             break;
     }
 
-    if (newFrom == from && newTo == to) return;
-    else {
+    if (newFrom != from || newTo != to) {
 
         // date range changed lets refresh
         from = newFrom;
@@ -355,16 +367,19 @@ GcCalendar::setSummary()
 
         // set webview contents
         summary->page()->mainFrame()->setHtml(summaryText);
-
-        // tell everyone the date range changed
-        QString name;
-        if (summarySelect->currentIndex() == 0) name = tr("Day of ") + from.toString("dddd MMMM d");
-        else if (summarySelect->currentIndex() == 1) name = QString(tr("Week Commencing %1")).arg(from.toString("dddd MMMM d"));
-        else if (summarySelect->currentIndex() == 2) name = from.toString(tr("MMMM yyyy"));
-        
-        emit dateRangeChanged(DateRange(from, to, name));
-
     }
+
+    // we always tell everyone the date range changed
+    QString name;
+
+    if (summarySelect->currentIndex() == 0)
+        name = tr("Day of ") + from.toString("dddd MMMM d");
+    else if (summarySelect->currentIndex() == 1)
+        name = QString(tr("Week Commencing %1")).arg(from.toString("dddd MMMM d"));
+    else if (summarySelect->currentIndex() == 2)
+        name = from.toString(tr("MMMM yyyy"));
+
+    emit dateRangeChanged(DateRange(from, to, name));
 }
 
 //********************************************************************************
@@ -707,6 +722,18 @@ GcMiniCalendar::clearRide()
 }
 
 void
+GcMiniCalendar::setFilter(QStringList filter)
+{
+    filters = filter;
+}
+
+void
+GcMiniCalendar::clearFilter()
+{
+    filters.clear();
+}
+
+void
 GcMiniCalendar::setDate(int _month, int _year)
 {
 
@@ -725,6 +752,12 @@ GcMiniCalendar::setDate(int _month, int _year)
             GcLabel *d = dayLabels.at(row*7+col);
             QModelIndex p = calendarModel->index(row,col);
             QDate date = calendarModel->date(p);
+
+            // filtered dates surrounded in light blue
+            d->setFiltered(false);
+            foreach (QString file, calendarModel->data(p, GcCalendarModel::FilenamesRole).toStringList()) {
+                if (filters.contains(file)) d->setFiltered(true);
+            }
 
             if (date.month() != month || date.year() != year) {
                 d->setText("");
@@ -768,17 +801,12 @@ GcMultiCalendar::GcMultiCalendar(MainWindow *main) : QScrollArea(main), main(mai
 {
     setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Expanding);
     setContentsMargins(0,0,0,0);
-    QVBoxLayout *mainLayout = new QVBoxLayout(this);
-    mainLayout->setSpacing(0);
-    mainLayout->setContentsMargins(10,10,0,0);
 
     setFrameStyle(QFrame::NoFrame);
 
-    layout = new QVBoxLayout;
+    layout = new GcWindowLayout(this, 0, 4, 0);
     layout->setSpacing(0);
-    layout->setContentsMargins(0,0,0,0);
-    mainLayout->addLayout(layout);
-    mainLayout->addStretch();
+    layout->setContentsMargins(10,10,0,0);
 
     QPalette pal;
     pal.setColor(QPalette::Window, Qt::white);
@@ -795,12 +823,43 @@ GcMultiCalendar::GcMultiCalendar(MainWindow *main) : QScrollArea(main), main(mai
 }
 
 void
+GcMultiCalendar::setFilter(QStringList filter)
+{
+    this->filters = filter;
+
+    for (int i=0; i<calendars.count();i++) {
+        calendars.at(i)->setFilter(filter);
+    }
+
+    // refresh
+    int month, year;
+    calendars.at(0)->getDate(month,year);
+    dateChanged(month,year);
+}
+
+void
+GcMultiCalendar::clearFilter()
+{
+    this->filters.clear();
+
+    for (int i=0; i<calendars.count();i++) {
+        calendars.at(i)->clearFilter();
+    }
+
+    // refresh
+    int month, year;
+    calendars.at(0)->getDate(month,year);
+    dateChanged(month,year);
+}
+
+void
 GcMultiCalendar::dateChanged(int month, int year)
 {
     setUpdatesEnabled(false);
 
     // master changed make all the others change too
     QDate date(year,month,01);
+    calendars.at(0)->setDate(month, year);
     for (int i=1; i<calendars.count();i++) {
         QDate ours = date.addMonths(i);
         calendars.at(i)->setDate(ours.month(), ours.year());
@@ -811,21 +870,28 @@ GcMultiCalendar::dateChanged(int month, int year)
 void
 GcMultiCalendar::resizeEvent(QResizeEvent*)
 {
-    showing = height() < 180 ? 1 : height() / 180;
+    // we expand x and y
+    showing = height() < 180 ? 1 : (int)(height() / 180);
+    showing *= width() < 180 ? 1 : (int)(width() / 180);
+
     int have = calendars.count();
 
     if (showing > calendars.count()) {
 
         for (int i=have; i<showing; i++) {
             GcMiniCalendar *mini = new GcMiniCalendar(main, false);
+            mini->setFilter(this->filters);
             calendars.append(mini);
-            layout->insertWidget(i, mini);
+            layout->insert(i, mini);
         }
         
     } else {
 
         for (int i=0; i<have; i++) {
-            if (i<showing) calendars.at(i)->show();
+            if (i<showing) {
+                calendars.at(i)->setFilter(this->filters);
+                calendars.at(i)->show();
+            }
             else calendars.at(i)->hide();
         }
     }

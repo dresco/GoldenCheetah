@@ -562,10 +562,18 @@ MainWindow::MainWindow(const QDir &home) :
     listView = new RideNavigator(this, true);
     listView->setProperty("nomenu", true);
 
+    // sidebar items
+    gcCalendar = new GcCalendar(this);
+    gcMultiCalendar = new GcMultiCalendar(this);
+
     // we need to connect the search box on Linux/Windows
 #if !defined (Q_OS_MAC) && defined (GC_HAVE_LUCENE)
     connect(searchBox, SIGNAL(searchResults(QStringList)), listView, SLOT(searchStrings(QStringList)));
+    connect(searchBox, SIGNAL(searchResults(QStringList)), gcCalendar, SLOT(setFilter(QStringList)));
+    connect(searchBox, SIGNAL(searchResults(QStringList)), gcMultiCalendar, SLOT(setFilter(QStringList)));
     connect(searchBox, SIGNAL(searchClear()), listView, SLOT(clearSearch()));
+    connect(searchBox, SIGNAL(searchClear()), gcCalendar, SLOT(clearFilter()));
+    connect(searchBox, SIGNAL(searchClear()), gcMultiCalendar, SLOT(clearFilter()));
 #endif
     // retrieve settings (properties are saved when we close the window)
     if (appsettings->cvalue(cyclist, GC_NAVHEADINGS, "").toString() != "") {
@@ -616,7 +624,6 @@ MainWindow::MainWindow(const QDir &home) :
     intervalSplitter->setCollapsible(1, false);
 
     GcSplitterItem *calendarItem = new GcSplitterItem(tr("Calendar"), iconFromPNG(":images/sidebar/calendar.png"), this);
-    gcMultiCalendar = new GcMultiCalendar(this);
     calendarItem->addWidget(gcMultiCalendar);
 
     analItem = new GcSplitterItem(tr("Activities"), iconFromPNG(":images/sidebar/folder.png"), this);
@@ -726,7 +733,6 @@ MainWindow::MainWindow(const QDir &home) :
     // POPULATE TOOLBOX
 
     // do controllers after home windows -- they need their first signals caught
-    gcCalendar = new GcCalendar(this);
     connect(gcCalendar, SIGNAL(dateRangeChanged(DateRange)), this, SLOT(dateRangeChangedDiary(DateRange)));
 
     ltmSidebar = new LTMSidebar(this, home);
@@ -2773,9 +2779,13 @@ MainWindow::searchTextChanged(QString text)
     // clear or set...
     if (text == "") {
         listView->clearSearch();
+        gcCalendar->clearFilter();
+        gcMultiCalendar->clearFilter();
     } else {
         lucene->search(text);
         listView->searchStrings(lucene->files());
+        gcCalendar->setFilter(lucene->files());
+        gcMultiCalendar->setFilter(lucene->files());
     }
 #endif
 }
