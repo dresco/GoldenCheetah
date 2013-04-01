@@ -111,6 +111,10 @@
 # that too and then set BOOST_INCLUDE to that location
 # If the files are in /usr/include/boost then set
 #BOOST_INCLUDE = /usr/include
+#Additionally, on MAC the latest libs also need the following
+#QMAKE_CFLAGS_X86_64 += -mmacosx-version-min=10.7
+#QMAKE_CXXFLAGS_X86_64 = $$QMAKE_CFLAGS_X86_64
+#LIBS += -lexpat -luriparser -lminizip
 
 # If you want support for downloading from iCal calendars you will need libical
 #     http://sourceforge.net/projects/freeassociation/
@@ -175,7 +179,7 @@
 #two lines once you habve installed clucene developer libraries
 #and runtimes. See the INSTALL guide for your platform. 
 #CLUCENE_INCLUDE = /usr/include/CLucene
-#CLUCENE_LIBS    = -lclucene
+#CLUCENE_LIBS    = -lclucene-core
 
 
 # *** Mac users NOTE ***
