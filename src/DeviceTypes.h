@@ -59,6 +59,8 @@ class DeviceType
 
 class DeviceTypes
 {
+    Q_DECLARE_TR_FUNCTIONS(DeviceTypes)
+
     public:
         DeviceTypes();
         ~DeviceTypes();
