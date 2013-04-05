@@ -145,7 +145,7 @@ QList<MainWindow *> mainwindows; // keep track of all the MainWindows we have op
 QDesktopWidget *desktop = NULL;
 
 MainWindow::MainWindow(const QDir &home) :
-    home(home), session(0), isclean(false), ismultisave(false),
+    home(home), session(0), isclean(false), ismultisave(false), isfiltered(false),
     zones_(new Zones), hrzones_(new HrZones),
     ride(NULL), workout(NULL), groupByMapper(NULL)
 {
@@ -161,6 +161,15 @@ MainWindow::MainWindow(const QDir &home) :
     WFApi *w = WFApi::getInstance(); // ensure created on main thread
     w->apiVersion();//shutup compiler
     #endif
+
+    // Metadata fields
+    _rideMetadata = new RideMetadata(this,true);
+    _rideMetadata->hide();
+
+    #ifdef GC_HAVE_LUCENE
+    namedSearches = new NamedSearches(home); // must be before navigator
+    #endif
+
     if (desktop == NULL) desktop = QApplication::desktop();
     static const QIcon hideIcon(":images/toolbar/main/hideside.png");
     static const QIcon rhideIcon(":images/toolbar/main/hiderside.png");
@@ -312,9 +321,11 @@ MainWindow::MainWindow(const QDir &home) :
     head->addWidget(viewsel);
 
 #ifdef GC_HAVE_LUCENE
-    QtMacSearchBox *searchBox = new QtMacSearchBox(this);
+    SearchFilterBox *searchBox = new SearchFilterBox(this,this);
+    QCleanlooksStyle *toolStyle = new QCleanlooksStyle();
+    searchBox->setStyle(toolStyle);
+    searchBox->setFixedWidth(250);
     head->addWidget(searchBox);
-    connect(searchBox, SIGNAL(textChanged(QString)), this, SLOT(searchTextChanged(QString)));
 #endif
 
 #endif // MAC NATIVE TOOLBAR AND SCOPEBAR
@@ -380,9 +391,6 @@ MainWindow::MainWindow(const QDir &home) :
      * Central instances of shared data
      *--------------------------------------------------------------------*/
 
-    // Metadata fields
-    _rideMetadata = new RideMetadata(this,true);
-    _rideMetadata->hide();
 #ifdef GC_HAVE_LUCENE
     lucene = new Lucene(this, this); // before metricDB attempts to refresh
 #endif
@@ -410,9 +418,6 @@ MainWindow::MainWindow(const QDir &home) :
      * Non-Mac Toolbar
      *--------------------------------------------------------------------*/
 
-#ifdef GC_HAVE_LUCENE
-    namedSearches = new NamedSearches(home); // must be before navigator
-#endif
 #ifndef Q_OS_MAC
 
     head = new GcToolBar(this);
@@ -575,13 +580,19 @@ MainWindow::MainWindow(const QDir &home) :
     gcMultiCalendar = new GcMultiCalendar(this);
 
     // we need to connect the search box on Linux/Windows
-#if !defined (Q_OS_MAC) && defined (GC_HAVE_LUCENE)
+#ifdef GC_HAVE_LUCENE
+
+    // link to the sidebars
     connect(searchBox, SIGNAL(searchResults(QStringList)), listView, SLOT(searchStrings(QStringList)));
     connect(searchBox, SIGNAL(searchResults(QStringList)), gcCalendar, SLOT(setFilter(QStringList)));
     connect(searchBox, SIGNAL(searchResults(QStringList)), gcMultiCalendar, SLOT(setFilter(QStringList)));
     connect(searchBox, SIGNAL(searchClear()), listView, SLOT(clearSearch()));
     connect(searchBox, SIGNAL(searchClear()), gcCalendar, SLOT(clearFilter()));
     connect(searchBox, SIGNAL(searchClear()), gcMultiCalendar, SLOT(clearFilter()));
+
+    // and global for charts AFTER sidebars
+    connect(searchBox, SIGNAL(searchResults(QStringList)), this, SLOT(searchResults(QStringList)));
+    connect(searchBox, SIGNAL(searchClear()), this, SLOT(searchClear()));
 #endif
     // retrieve settings (properties are saved when we close the window)
     if (appsettings->cvalue(cyclist, GC_NAVHEADINGS, "").toString() != "") {
@@ -1496,6 +1507,23 @@ MainWindow::closeEvent(QCloseEvent* event)
             qDebug()<<"closeEvent: mainwindows list error";
 
     }
+}
+
+// global search/data filter
+void
+MainWindow::searchResults(QStringList f)
+{
+    filters = f;
+    isfiltered = true;
+    emit filterChanged(filters);
+}
+
+void
+MainWindow::searchClear()
+{
+    filters.clear();
+    isfiltered = false;
+    emit filterChanged(filters);
 }
 
 void
