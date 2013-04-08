@@ -98,7 +98,6 @@
 #include "QtMacButton.h" // mac
 #include "QtMacPopUpButton.h" // mac
 #include "QtMacSegmentedButton.h" // mac
-#include "QtMacSearchBox.h" // mac
 #else
 #include "QTFullScreen.h" // not mac!
 #include "../qtsolutions/segmentcontrol/qtsegmentcontrol.h"
@@ -234,8 +233,8 @@ MainWindow::MainWindow(const QDir &home) :
         QRect size = desktop->availableGeometry();
 
         // ensure saved geometry isn't greater than current screen size
-        if ((geom.toRect().height() > size.height()) || (geom.toRect().width() > size.width()))
-            setGeometry(size);
+        if ((geom.toRect().height() >= size.height()) || (geom.toRect().width() >= size.width()))
+            setGeometry(size.x()+30,size.y()+30,size.width()-60,size.height()-60);
         else
             setGeometry(geom.toRect());
     }

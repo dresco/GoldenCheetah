@@ -34,9 +34,9 @@ SearchBox::SearchBox(MainWindow *main, QWidget *parent)
     //clear button
     clearButton = new QToolButton(this);
     clearButton->setStyleSheet("QToolButton { border: none; padding: 0px; }");
-    QIcon pixmap(":images/toolbar/clear.png");
+    QIcon pixmap(":images/toolbar/popbutton.png");
     clearButton->setIcon(QIcon(pixmap));
-    clearButton->setIconSize(QSize(16,16));
+    clearButton->setIconSize(QSize(12,12));
     clearButton->setCursor(Qt::ArrowCursor);
     clearButton->hide();
     //connect(clearButton, SIGNAL(clicked()), this, SLOT(clear()));
@@ -69,13 +69,25 @@ SearchBox::SearchBox(MainWindow *main, QWidget *parent)
     setAttribute(Qt::WA_MacShowFocusRect, 0);
 #endif
     setObjectName("SearchBox");
+    QColor color = QPalette().color(QPalette::Highlight);
     setStyleSheet(QString( //"QLineEdit { padding-right: %1px; } "
                           "QLineEdit#SearchBox {"
                           "    border-radius: 10px; "
                           "    border: 1px solid rgba(127,127,127,127);"
                           "    padding: 0px %1px;"
                           "}"
-                 ).arg(clearButton->sizeHint().width() + frameWidth + 12));
+                          "QLineEdit#SearchBox:focus {"
+                          "    border-radius: 10px; "
+#ifdef WIN32
+                          "    border: 1px solid rgba(%2,%3,%4,255);"
+#else
+                          "    border: 2px solid rgba(%2,%3,%4,255);"
+#endif
+                          "    padding: 0px %5px;"
+                          "}"
+                 ).arg(clearButton->sizeHint().width() + frameWidth + 12)
+                  .arg(color.red()).arg(color.green()).arg(color.blue())
+                  .arg(clearButton->sizeHint().width() + frameWidth + 12));
 
     setPlaceholderText(tr("Search..."));
     mode = Search;
@@ -90,10 +102,13 @@ void SearchBox::resizeEvent(QResizeEvent *)
 {
     QSize sz = clearButton->sizeHint();
     int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
-    clearButton->move(rect().right() - frameWidth - sz.width(),
-                      (rect().bottom() + 1 - sz.height())/2);
+    clearButton->move(rect().right() - frameWidth - sz.width() - 1, 3);
     searchButton->move(5, 3);
+#ifndef Q_OS_MAC
+    toolButton->move(15, 0);
+#else
     toolButton->move(13, 0);
+#endif
 
     //container->move(rect().left(), rect().bottom() + 3); // named dialog...
     checkMenu();

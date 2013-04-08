@@ -91,7 +91,7 @@ void GCColor::setupColors()
         { tr("Aerolab Elevation"), "COLORAEROEL", Qt::green },
         { tr("Calendar background"), "CCALCELL", Qt::white },
         { tr("Calendar heading"), "CCALHEAD", QColor(230,230,230) },
-        { tr("Calendar Current Selection"), "CCALCURRENT", Qt::darkBlue },
+        { tr("Calendar Current Selection"), "CCALCURRENT", QColor(255,213,0) },
         { tr("Calendar Actual Workout"), "CCALACTUAL", Qt::green },
         { tr("Calendar Planned Workout"), "CCALPLANNED", Qt::yellow },
         { tr("Calendar Today"), "CCALTODAY", Qt::cyan },
@@ -110,6 +110,10 @@ void GCColor::setupColors()
         { tr("Right Balance"), "CBALANCERIGHT", QColor(128,0,50) },
         { "", "", QColor(0,0,0) },
     };
+
+    // set the defaults to system detaults
+    init[CCALCURRENT].color = QPalette().color(QPalette::Highlight);
+    init[CTOOLBAR].color = QPalette().color(QPalette::Window);
 
     copyArray(init, DefaultColorList);
     copyArray(init, ColorList);
@@ -193,6 +197,11 @@ GCColor::readConfig()
             if (ColorList[i].name == "CTOOLBAR") {
                 QPalette def;
                 ColorList[i].color = def.color(QPalette::Window);
+            }
+            if (ColorList[i].name == "CCALCURRENT") {
+                QPalette def;
+                ColorList[i].color = def.color(QPalette::Highlight);
+
             }
         }
     }
