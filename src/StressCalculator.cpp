@@ -14,13 +14,11 @@ StressCalculator::StressCalculator (
     QString cyclist,
 	QDateTime startDate,
 	QDateTime endDate,
-        double initialSTS = 0,
-	double initialLTS = 0,
 	int shortTermDays = 7,
 	int longTermDays = 42) :
 	startDate(startDate), endDate(endDate), shortTermDays(shortTermDays),
 	longTermDays(longTermDays),
-	initialSTS(initialSTS), initialLTS(initialLTS), lastDaysIndex(-1)
+	lastDaysIndex(-1)
 {
     // calc SB for today or tomorrow?
     showSBToday = appsettings->cvalue(cyclist, GC_SB_TODAY).toInt();
@@ -103,6 +101,14 @@ void StressCalculator::calculateStress(MainWindow *main, QString, const QString 
     startDate = startDate < results[0].getRideDate() ? startDate : results[0].getRideDate();
     endDate   = endDate > results[results.count()-1].getRideDate() ? endDate : results[results.count()-1].getRideDate();
 
+    // but we need to also take into account the earliest
+    // start date for any season -- since it may be seeded
+    // so lets run through the seasons and set start date
+    // to the very earliest date set
+    foreach(Season x, main->seasons->seasons)
+        if (x.getStart() < startDate.date())
+            startDate = QDateTime(x.getStart(), QTime(0,0,0));
+    
     int maxarray = startDate.daysTo(endDate) +2; // from zero plus tomorrows SB!
     stsvalues.resize(maxarray);
     ltsvalues.resize(maxarray);
@@ -151,7 +157,10 @@ void StressCalculator::calculateStress(MainWindow *main, QString, const QString 
         ltsramp.remove(0, firstindex);
         stsramp.remove(0, firstindex);
         sbvalues.remove(0, firstindex);
-        xdays.remove(0, firstindex);
+        //!! no! days always start from 0
+        //!! so we do not do the bwlow ..
+        //!! left commented out as an explanation
+        // xdays.remove(0, firstindex);
         list.remove(0, firstindex);
     }
 
@@ -173,7 +182,6 @@ void StressCalculator::calculateStress(MainWindow *main, QString, const QString 
  */
 void StressCalculator::addRideData(double BS, QDateTime rideDate) {
     int daysIndex = startDate.daysTo(rideDate);
-
     // fill in any missing days before today
     int d;
     for (d = lastDaysIndex + 1; d < daysIndex ; d++) {
@@ -205,21 +213,19 @@ void StressCalculator::calculate(int daysIndex) {
 
     // if its seeded leave it alone
     if (ltsvalues[daysIndex] >=0 || stsvalues[daysIndex]>=0) {
+
         // LTS
-        if (daysIndex == 0)
-            lastLTS = initialLTS;
-        else
-            lastLTS = ltsvalues[daysIndex-1];
+        if (daysIndex) lastLTS = ltsvalues[daysIndex-1];
+        else lastLTS = 0;
 
         ltsvalues[daysIndex] = (list[daysIndex] * (1.0 - lte)) + (lastLTS * lte);
 
         // STS
-        if (daysIndex == 0)
-            lastSTS = initialSTS;
-        else
-            lastSTS = stsvalues[daysIndex-1];
+        if (daysIndex) lastSTS = stsvalues[daysIndex-1];
+        else lastSTS = 0;
 
         stsvalues[daysIndex] = (list[daysIndex] * (1.0 - ste)) + (lastSTS * ste);
+
     } else if (ltsvalues[daysIndex]< 0|| stsvalues[daysIndex]<0) {
 
         ltsvalues[daysIndex] *= -1;
