@@ -390,7 +390,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                     uint16_t torque = antMessage.torque - lastMessage.torque;
 
                     if (events && period) {
-
+                        qDebug() << "AntChannel::broadcastEvent() ANT_WHEELTORQUE_POWER setting power & speed";
                         nullCount = 0;
 
                         float nm_torque = torque / (32.0 * events);
@@ -405,6 +405,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                         nullCount++;
 
                         if (nullCount >= 4) { // 4 messages on Powertap according to specs
+                            qDebug() << "AntChannel::broadcastEvent() ANT_WHEELTORQUE_POWER zeroing power & speed";
                             parent->setWheelRpm(0);
                             value2 = value = 0;
                             is_alt ? parent->setAltWatts(0) : parent->setWatts(0);
@@ -425,6 +426,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                 {
                     uint8_t events = antMessage.eventCount - lastStdPwrMessage.eventCount;
                     if (lastStdPwrMessage.type && events) {
+                        qDebug() << "AntChannel::broadcastEvent() ANT_STANDARD_POWER setting power & cadence";
                         stdNullCount = 0;
                         is_alt ? parent->setAltWatts(antMessage.instantPower) : parent->setWatts(antMessage.instantPower);
                         value2 = value = antMessage.instantPower;
@@ -432,6 +434,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                     } else {
                        stdNullCount++;
                        if (stdNullCount >= 6) { //6 for standard power according to specs
+                           qDebug() << "AntChannel::broadcastEvent() ANT_STANDARD_POWER zeroing power & cadence";
                            parent->setCadence(0);
                            is_alt ? parent->setAltWatts(0) : parent->setWatts(0);
                            value2 = value = 0;
@@ -485,12 +488,14 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                // cadence first...
                uint16_t time = antMessage.measurementTime - lastMessage.measurementTime;
                if (time) {
+                   qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_HR setting bpm";
                    nullCount = 0;
                    parent->setBPM(antMessage.instantHeartrate);
                    value2 = value = antMessage.instantHeartrate;
                } else {
                    nullCount++;
                    if (nullCount >= 12) {
+                        qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_HR zeroing bpm";
                         parent->setBPM(0); // 12 according to the docs
                         value2 = value = 0;
                     }
@@ -504,6 +509,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                uint16_t time = antMessage.crankMeasurementTime - lastMessage.crankMeasurementTime;
                uint16_t revs = antMessage.crankRevolutions - lastMessage.crankRevolutions;
                if (time) {
+                   qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_CADENCE setting cadence";
                    float cadence = 1024*60*revs / time;
                    parent->setCadence(cadence);
                    value2 = value = cadence;
@@ -518,14 +524,17 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                uint16_t time = antMessage.crankMeasurementTime - lastMessage.crankMeasurementTime;
                uint16_t revs = antMessage.crankRevolutions - lastMessage.crankRevolutions;
                if (time) {
+                   qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SandC setting cadence";
                    nullCount = 0;
                    float cadence = 1024*60*revs / time;
                    parent->setCadence(cadence);
                    value = cadence;
                } else {
                    nullCount++;
-                   if (nullCount >= 12) { parent->setCadence(0);
-                                          value = 0;
+                   if (nullCount >= 12) {
+                       qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SandC zeroing cadence";
+                       parent->setCadence(0);
+                       value = 0;
                     }
                }
 
@@ -533,6 +542,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                time = antMessage.wheelMeasurementTime - lastMessage.wheelMeasurementTime;
                revs = antMessage.wheelRevolutions - lastMessage.wheelRevolutions;
                if (time) {
+                   qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SandC setting speed";
                    dualNullCount = 0;
 
                    float rpm = 1024*60*revs / time;
@@ -542,6 +552,7 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
 
                     dualNullCount++;
                     if (dualNullCount >= 12) {
+                        qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SandC zeroing speed";
                         parent->setWheelRpm(0);
                         value2 = 0;
                     }
@@ -555,14 +566,18 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                uint16_t time = antMessage.wheelMeasurementTime - lastMessage.wheelMeasurementTime;
                uint16_t revs = antMessage.wheelRevolutions - lastMessage.wheelRevolutions;
                if (time) {
+                   qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SPEED setting speed";
                    nullCount=0;
                    float rpm = 1024*60*revs / time;
                    parent->setWheelRpm(rpm);
                    value2=value=rpm;
                } else {
                    nullCount++;
-                   if (nullCount >= 12) parent->setWheelRpm(0);
-                   value2=value=0;
+                   if (nullCount >= 12) {
+                       qDebug() << "AntChannel::broadcastEvent() CHANNEL_TYPE_SPEED zeroing speed";
+                       parent->setWheelRpm(0);
+                       value2=value=0;
+                   }
                }
            }
            break;
