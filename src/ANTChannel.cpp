@@ -426,11 +426,11 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                         stdNullCount = 0;
                         is_alt ? parent->setAltWatts(antMessage.instantPower) : parent->setWatts(antMessage.instantPower);
                         value2 = value = antMessage.instantPower;
-                        parent->setCadence(antMessage.instantCadence); // cadence
+                        //parent->setCadence(antMessage.instantCadence); // cadence
                     } else {
                        stdNullCount++;
                        if (stdNullCount >= 6) { //6 for standard power according to specs
-                           parent->setCadence(0);
+                           //parent->setCadence(0);
                            is_alt ? parent->setAltWatts(0) : parent->setWatts(0);
                            value2 = value = 0;
                        }
@@ -534,13 +534,13 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                    dualNullCount = 0;
 
                    float rpm = 1024*60*revs / time;
-                   parent->setWheelRpm(rpm);
+                   //parent->setWheelRpm(rpm);
                    value2 = rpm;
                } else {
 
                     dualNullCount++;
                     if (dualNullCount >= 12) {
-                        parent->setWheelRpm(0);
+                        //parent->setWheelRpm(0);
                         value2 = 0;
                     }
                }
