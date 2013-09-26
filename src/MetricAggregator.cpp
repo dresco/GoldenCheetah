@@ -29,7 +29,6 @@
 #include "RideItem.h"
 #include "RideMetric.h"
 #include "TimeUtils.h"
-#include <assert.h>
 #include <math.h>
 #include <QtXml/QtXml>
 #include <QProgressDialog>
@@ -165,6 +164,8 @@ void MetricAggregator::refreshMetrics(QDateTime forceAfterThisDate)
 
             if (ride != NULL) {
 
+                out << "Getting weight: " << name << "\r\n";
+                ride->getWeight();
                 out << "Updating statistics: " << name << "\r\n";
                 importRide(home, ride, name, zoneFingerPrint, (dbTimeStamp > 0));
 
@@ -186,18 +187,24 @@ void MetricAggregator::refreshMetrics(QDateTime forceAfterThisDate)
         }
     }
 
-    // stop logging
-    out << "METRIC REFRESH ENDS: " << QDateTime::currentDateTime().toString() + "\r\n";
-    log.close();
-
     // end LUW -- now syncs DB
+    out << "COMMIT: " << QDateTime::currentDateTime().toString() + "\r\n";
     dbaccess->connection().commit();
+
 #ifdef GC_HAVE_LUCENE
+#ifndef WIN32 // windows crashes here....
+    out << "OPTIMISE: " << QDateTime::currentDateTime().toString() + "\r\n";
     main->lucene->optimise();
+#endif
 #endif
     main->isclean = true;
 
+    // stop logging
+    out << "SIGNAL DATA CHANGED: " << QDateTime::currentDateTime().toString() + "\r\n";
     dataChanged(); // notify models/views
+
+    out << "METRIC REFRESH ENDS: " << QDateTime::currentDateTime().toString() + "\r\n";
+    log.close();
 }
 
 /*----------------------------------------------------------------------
@@ -231,7 +238,7 @@ bool MetricAggregator::importRide(QDir path, RideFile *ride, QString fileName, u
         return false; // not a ridefile!
     }
     summaryMetric.setFileName(fileName);
-    assert(rx.numCaptures() == 7);
+    //assert(rx.numCaptures() == 7); -- it was an exact match of course there are 7
     QDate date(rx.cap(1).toInt(), rx.cap(2).toInt(),rx.cap(3).toInt());
     QTime time(rx.cap(4).toInt(), rx.cap(5).toInt(),rx.cap(6).toInt());
     QDateTime dateTime(date, time);

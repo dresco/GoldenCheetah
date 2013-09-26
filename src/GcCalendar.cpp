@@ -121,19 +121,17 @@ GcCalendar::GcCalendar(MainWindow *main) : main(main)
 void
 GcCalendar::refresh()
 {
-    multiCalendar->refresh();
-    setSummary();
-    repaint();
+    if (!isHidden()) {
+        multiCalendar->refresh();
+        setSummary();
+        repaint();
+    }
 }
 
 void
 GcCalendar::setRide(RideItem *ride)
 {
     _ride = ride;
-
-    QDate when;
-    if (_ride && _ride->ride()) when = _ride->dateTime.date();
-    else when = QDate::currentDate();
 
     multiCalendar->setRide(ride);
     setSummary();
@@ -193,6 +191,14 @@ GcLabel::paintEvent(QPaintEvent *)
         else painter.setPen(QColor(0,0,0,170));
 
         painter.drawText(norm, alignment(), text());
+
+        if (highlighted) {
+            QColor over = GColor(CCALCURRENT);
+            over.setAlpha(180);
+            painter.setPen(over);
+
+            painter.drawText(norm, alignment(), text());
+        }
     } else {
 
         // use standard icons
@@ -644,7 +650,8 @@ GcMiniCalendar::previous()
 
     // begin of month
     QDateTime bom(QDate(year,month,01), QTime(0,0,0));
-    for(int i=allDates.count()-1; i>0; i--) {
+
+    for(int i=allDates.count()-1; i>=0; i--) {
         if (allDates.at(i) < bom) {
 
             QDate date = allDates.at(i).date();
@@ -821,6 +828,7 @@ GcMultiCalendar::GcMultiCalendar(MainWindow *main) : QScrollArea(main), main(mai
 
     GcMiniCalendar *mini = new GcMiniCalendar(main, true);
     calendars.append(mini);
+    mini->setDate(QDate::currentDate().month(), QDate::currentDate().year()); // default to this month
     layout->addWidget(mini);
 
     // only 1 months are visible right now
@@ -946,6 +954,13 @@ GcMultiCalendar::setRide(RideItem *ride)
     if (active) return;
     if (!isVisible()) {
         stale = true;
+
+        // notify of ride gone though as not repeated
+        if (!_ride) {
+            for (int i=0; i<showing; i++) {
+                calendars.at(i)->setRide(_ride); // current ride is on this one
+            }
+        }
         return;
     }
 
@@ -1005,7 +1020,7 @@ GcMultiCalendar::refresh()
 void
 GcMultiCalendar::showEvent(QShowEvent*)
 {
+    setRide(_ride);
     setFilter(filters);
     resizeEvent(NULL);
-    setRide(_ride);
 }

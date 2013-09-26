@@ -182,18 +182,18 @@ the functions of note are also available in GoldenCheetah.
 2.3 Where can I download the installer for GoldenCheetah ?
 ==========================================================
 
-Stable releases are available from www.goldencheetah.org whilst the
-latest and greatest code build is available from
-goldencheetah.stand2surf.net. Development builds are for the brave,
-since they may contain bugs. In reality the development builds are a
-changing feast and often contain latest fixes too.
+Stable releases are available from `http://www.goldencheetah.org'
+whilst the latest and greatest code build is available from
+`http://goldencheetah.stand2surf.net'. Development builds are for the
+brave, since they may contain bugs. In reality the development builds
+are a changing feast and often contain latest fixes too.
 
 2.4 Where can I get the source code?
 ====================================
 
-The GoldenCheetah source code is hosted on github here:
-www.github.com/GoldenCheetah/GoldenCheetah. It can be cloned locally
-using 'git clone git://github.com/GoldenCheetah/GoldenCheetah.git'.
+The GoldenCheetah source code is hosted on github and can be cloned
+using the following url;
+`git://github.com/GoldenCheetah/GoldenCheetah.git'
 
 2.5 I am a triathlete is GoldenCheetah appropriate for me?
 ==========================================================
@@ -209,7 +209,7 @@ triathlon, or working on the trainer.
 
 The mailing list for GoldenCheetah users is maintained via Google
 Groups at
-http://groups.google.com/forum/?fromgroups=#forum/golden-cheetah-uers
+`http://groups.google.com/forum/?fromgroups=#forum/golden-cheetah-users'
 the first post you make is moderated and may take a while to appear.
 Once your first post is made you can make future posts without
 moderation.
@@ -219,7 +219,7 @@ moderation.
 
 We use Github issues to record bugs and feature requests. You will need
 to create an account on github and then post a new request or bug at
-www.github.com/GoldenCheetah/GoldenCheetah/issues
+`http://www.github.com/GoldenCheetah/GoldenCheetah/issues'
 
 2.8 How can I contribute?
 =========================
@@ -259,7 +259,7 @@ training stress of the ride.
 In practice, NP and xPower are largely the same, whilst Daniels EqP
 place much higher emphasise on upper intensity work. For more info on
 xPower see Dr Skiba's paper on BikeScore
-http://www.physfarm.com/bikescore.pdf
+`http://www.physfarm.com/bikescore.pdf'
 
 3.2 What is the difference between CP and FTP?
 ==============================================
@@ -533,10 +533,26 @@ to specify a collection. This means when entering the details in the
 passwords pane of preferences you should use the following for the
 caldav url:
 
-https://www.google.com/calendar/dav/xxxx@gmail.com/events/
+`https://www.google.com/calendar/dav/xxxx@gmail.com/events/'
 
 Where xxxx is your username. The username will need to be repeated in
 the username field and obviously set the password too.
+
+5.5 When setting up my Withings wifi scales where do I get the userid and key ?
+===============================================================================
+
+You will need to login to your Withings account
+(`http://my.withings.com') and click on the `share' button at the top
+of the dashboard. From there you will get a popup box with lots of
+options.
+
+If you click on `share on my website' you will be greeted with a number
+of code snippets you can embed in a web page. If you look closely in
+the top right hand corner there will be a box containing the user id
+and public key. These are the two values you need to enter into the
+options dialog.
+
+You will now be able to retrieve withings data via the tools menu.
 
 
 File: GC3-FAQ.info,  Node: SEASONS AND EVENTS,  Next: CHARTS,  Prev: UPLOADING AND DOWNLOADING,  Up: Top
@@ -560,6 +576,18 @@ It is only used to annotate a LTM chart - so you can show an 'event'
 that happened at a particular date. There are no rules about what
 constitutes and event. It could be a race, a training camp or just a
 day that was particularly meaningful e.g. illness, crash.
+
+6.3 How do create/edit/delete seasons and events?
+=================================================
+
+Seasons and Events are created and edited in the sidebar for the Home
+view. Seasons are listed under date ranges, whilst events are listed
+under the events sidebar item. In both cases they can be created and
+deleted from the sidebar item's drop down menu.
+
+Please note that in v3.0 events can only be created when a user season
+is selected, since events are associated with a particular season. This
+constraint will be removed in v3.1.
 
 
 File: GC3-FAQ.info,  Node: CHARTS,  Next: INDEX,  Prev: SEASONS AND EVENTS,  Up: Top
@@ -619,13 +647,13 @@ There is also an overview of Virtual Elevation to measure aerodynamics
 in this YouTube video from the power seminar at Interbike 2011 given by
 Jim Meyer the founder of Quarq:
 
-http://www.youtube.com/watch?v=b8tJnFE_BFg&feature=youtu.be&t=27m58s
+`http://www.youtube.com/watch?v=b8tJnFE_BFg&feature=youtu.be&t=27m58s'
 
 Finally, Robert Chung's original paper is included in the docs section
 of the GoldenCheetah repository, you can it up here (click on 'View
 Raw' to download):
 
-https://github.com/GoldenCheetah/GoldenCheetah/blob/master/doc/contrib/ChungVE.pdf
+`https://github.com/GoldenCheetah/GoldenCheetah/blob/master/doc/contrib/ChungVE.pdf'
 
 7.4 My map doesn't show?
 ========================
@@ -691,11 +719,11 @@ Index
 * add:                                   MOST COMMON QUESTIONS OF ALL.
                                                               (line  20)
 * adhoc:                                 SEASONS AND EVENTS.  (line   9)
-* Aerolab <1>:                           MOST COMMON QUESTIONS OF ALL.
+* Aerolab <1>:                           CHARTS.              (line  33)
+* Aerolab:                               MOST COMMON QUESTIONS OF ALL.
                                                               (line  69)
-* Aerolab:                               CHARTS.              (line  33)
 * algorithm:                             CHARTS.              (line  19)
-* anomalies:                             DATA.                (line  38)
+* anomalies:                             DATA.                (line  23)
 * AP:                                    METRICS.             (line  80)
 * best:                                  MOST COMMON QUESTIONS OF ALL.
                                                               (line  61)
@@ -706,23 +734,22 @@ Index
 * colour:                                MOST COMMON QUESTIONS OF ALL.
                                                               (line 115)
 * contribute:                            GENERAL.             (line  73)
-* CP <1>:                                METRICS.             (line  22)
-* CP <2>:                                CHARTS.              (line  19)
-* CP:                                    METRICS.             (line  50)
+* CP <1>:                                CHARTS.              (line  19)
+* CP:                                    METRICS.             (line  22)
 * CSV:                                   DATA.                (line  88)
 * CTL:                                   METRICS.             (line  63)
 * cycle:                                 SEASONS AND EVENTS.  (line   9)
 * Daniels:                               METRICS.             (line   9)
 * donate:                                GENERAL.             (line  85)
-* download <1>:                          GENERAL.             (line  31)
-* download:                              UPLOADING AND DOWNLOADING.
+* download <1>:                          UPLOADING AND DOWNLOADING.
                                                               (line  16)
+* download:                              GENERAL.             (line  31)
 * elevation:                             METRICS.             (line  71)
 * EqP:                                   METRICS.             (line   9)
 * event:                                 SEASONS AND EVENTS.  (line  18)
 * feature:                               GENERAL.             (line  66)
 * FITLOG:                                DATA.                (line  88)
-* FTP:                                   METRICS.             (line  50)
+* FTP:                                   METRICS.             (line  22)
 * Garmin Connect:                        METRICS.             (line  80)
 * github:                                GENERAL.             (line  40)
 * Google:                                UPLOADING AND DOWNLOADING.
@@ -760,7 +787,7 @@ Index
 * TCX:                                   DATA.                (line  88)
 * trainer:                               METRICS.             (line  50)
 * TrainingPeaks:                         UPLOADING AND DOWNLOADING.
-                                                              (line  16)
+                                                              (line   9)
 * treemap:                               CHARTS.              (line  77)
 * triathlete:                            GENERAL.             (line  47)
 * TSS <1>:                               METRICS.             (line  80)
@@ -774,8 +801,10 @@ Index
                                                               (line  81)
 * weight:                                MOST COMMON QUESTIONS OF ALL.
                                                               (line  36)
+* Withings:                              UPLOADING AND DOWNLOADING.
+                                                              (line  46)
 * xPower:                                METRICS.             (line   9)
-* zoom:                                  CHARTS.              (line 108)
+* zoom:                                  CHARTS.              (line  97)
 
 
 
@@ -783,11 +812,11 @@ Tag Table:
 Node: Top164
 Node: MOST COMMON QUESTIONS OF ALL609
 Node: GENERAL6062
-Node: METRICS9703
-Node: DATA16693
-Node: UPLOADING AND DOWNLOADING20623
-Node: SEASONS AND EVENTS22386
-Node: CHARTS23245
-Node: INDEX28042
+Node: METRICS9684
+Node: DATA16676
+Node: UPLOADING AND DOWNLOADING20606
+Node: SEASONS AND EVENTS23090
+Node: CHARTS24487
+Node: INDEX29288
 
 End Tag Table

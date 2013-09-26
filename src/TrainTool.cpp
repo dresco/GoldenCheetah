@@ -23,7 +23,6 @@
 #include "Units.h"
 #include "DeviceTypes.h"
 #include "DeviceConfiguration.h"
-#include <assert.h>
 #include <QApplication>
 #include <QtGui>
 #include <QRegExp>
@@ -1067,8 +1066,15 @@ void TrainTool::guiUpdate()           // refreshes the telemetry
                 if (Devices[dev].type == DEV_BUDGET) {
                     rtData.setLoad(local.getLoad()); // and get load in case it was adjusted
                     rtData.setSlope(local.getSlope()); // and get slope in case it was adjusted
+                    // to within defined limits
                 }
 
+				if (Devices[dev].type == DEV_FORTIUS) {
+	                rtData.setLoad(local.getLoad()); // and get load in case it was adjusted
+                    rtData.setSlope(local.getSlope()); // and get slope in case it was adjusted	
+					// to within defined limits					
+				}
+				
                 // what are we getting from this one?
                 if (dev == bpmTelemetry) rtData.setHr(local.getHr());
                 if (dev == rpmTelemetry) rtData.setCadence(local.getCadence());

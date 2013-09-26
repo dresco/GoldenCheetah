@@ -25,7 +25,6 @@
 #include "Settings.h"
 #include "Colors.h"
 
-#include <assert.h>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_grid.h>
 #include <qwt_plot_canvas.h>
@@ -204,6 +203,7 @@ HrPwPlot::recalc()
 
     // Find Hr Delay
     if (delay == -1) delay = hrPwWindow->findDelay(clipWatts, clipHr, clipWatts.size());
+    else if (delay>rideTimeSecs) delay=rideTimeSecs;
 
     // Apply delay
     QVector<double> delayWatts(rideTimeSecs-delay);
@@ -612,7 +612,7 @@ class HrPwPlotZoneLabel: public QwtPlotItem
                 QList <int> zone_lows = zones->getZoneLows(zone_range);
                 QList <QString> zone_names = zones->getZoneNames(zone_range);
                 int num_zones = zone_lows.size();
-                assert(zone_names.size() == num_zones);
+                if (zone_names.size() != num_zones) return;
                 if (zone_number < num_zones) {
                     watts =
                         (

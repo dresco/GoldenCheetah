@@ -276,11 +276,13 @@ HEADERS += \
         GcBubble.h \
         GcCalendar.h \
         GcCalendarModel.h \
+        GcCrashDialog.h \
         GcPane.h \
         GcRideFile.h \
         GcScopeBar.h \
         GcSideBarItem.h \
         GcToolBar.h \
+        GcUpgrade.h \
         GcWindowLayout.h \
         GcWindowRegistry.h \
         GcWindowTool.h \
@@ -467,11 +469,13 @@ SOURCES += \
         FixHRSpikes.cpp \
         GcBubble.cpp \
         GcCalendar.cpp \
+        GcCrashDialog.cpp \
         GcPane.cpp \
         GcRideFile.cpp \
         GcScopeBar.cpp \
         GcSideBarItem.cpp \
         GcToolBar.cpp \
+        GcUpgrade.cpp \
         GcWindowLayout.cpp \
         GcWindowRegistry.cpp \
         GcWindowTool.cpp \

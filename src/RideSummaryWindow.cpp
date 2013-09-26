@@ -29,7 +29,6 @@
 #include "DBAccess.h"
 #include <QtGui>
 #include <QtXml/QtXml>
-#include <assert.h>
 #include <math.h>
 
 RideSummaryWindow::RideSummaryWindow(MainWindow *mainWindow, bool ridesummary) :
@@ -155,6 +154,8 @@ RideSummaryWindow::metadataChanged()
 void
 RideSummaryWindow::refresh()
 {
+    if (!amVisible()) return; // only if you can see me!
+
     // if we're summarising a ride but have no ride to summarise
     if (ridesummary && !myRideItem) {
 	    rideSummary->page()->mainFrame()->setHtml("");
@@ -186,7 +187,7 @@ RideSummaryWindow::htmlSummary() const
     RideFile *ride;
 
     if (!rideItem && !ridesummary) return ""; // nothing selected!
-    else ride = rideItem->ride();
+    else ride = rideItem ? rideItem->ride() : NULL;
 
     if (!ride && !ridesummary) return ""; // didn't parse!
 
@@ -320,8 +321,8 @@ RideSummaryWindow::htmlSummary() const
             case 0: metricsList = totalColumn; break;
             case 1: metricsList = averageColumn; break;
             case 2: metricsList = maximumColumn; break;
+            default:
             case 3: metricsList = metricColumn; break;
-            default: assert(false);
         }
         for (int j = 0; j< metricsList.count(); ++j) {
             QString symbol = metricsList[j];
@@ -381,24 +382,61 @@ RideSummaryWindow::htmlSummary() const
     //
     // Time In Zones
     //
-    if (rideItem->numZones() > 0) {
-        QVector<double> time_in_zone(rideItem->numZones());
-        for (int i = 0; i < rideItem->numZones(); ++i) {
+    int numzones = 0;
+    int range = -1;
+
+    // get zones to use via ride for ridesummary
+    if (ridesummary && rideItem) {
+
+        numzones = rideItem->numZones();
+        range = rideItem->zoneRange();
+
+    // or for end of daterange plotted for daterange summary
+    } else if (mainWindow->zones()) {
+
+        // get from end if period
+        range = mainWindow->zones()->whichRange(myDateRange.to);
+        if (range > -1) numzones = mainWindow->zones()->numZones(range);
+
+    }
+
+    if (range > -1 && numzones > 0) {
+        QVector<double> time_in_zone(numzones);
+        for (int i = 0; i < numzones; ++i) {
 
             // if using metrics or data
             if (ridesummary) time_in_zone[i] = metrics.getForSymbol(timeInZones[i]);
             else time_in_zone[i] = SummaryMetrics::getAggregated(mainWindow, timeInZones[i], data, filters, filtered, useMetricUnits, true).toDouble();
         }
         summary += tr("<h3>Power Zones</h3>");
-        summary += mainWindow->zones()->summarize(rideItem->zoneRange(), time_in_zone); //aggregating
+        summary += mainWindow->zones()->summarize(range, time_in_zone); //aggregating
     }
 
     //
     // Time In Zones HR
     //
-    if (rideItem->numHrZones() > 0) {
-        QVector<double> time_in_zone(rideItem->numHrZones());
-        for (int i = 0; i < rideItem->numHrZones(); ++i) {
+    int numhrzones = 0;
+    int hrrange = -1;
+
+    // get zones to use via ride for ridesummary
+    if (ridesummary && rideItem) {
+
+        numhrzones = rideItem->numHrZones();
+        hrrange = rideItem->hrZoneRange();
+
+    // or for end of daterange plotted for daterange summary
+    } else if (mainWindow->hrZones()) {
+
+        // get from end if period
+        hrrange = mainWindow->hrZones()->whichRange(myDateRange.to);
+        if (hrrange > -1) numhrzones = mainWindow->hrZones()->numZones(hrrange);
+
+    }
+
+    if (hrrange > -1 && numhrzones > 0) {
+
+        QVector<double> time_in_zone(numhrzones);
+        for (int i = 0; i < numhrzones; ++i) {
 
             // if using metrics or data
             if (ridesummary) time_in_zone[i] = metrics.getForSymbol(timeInZonesHR[i]);
@@ -406,7 +444,7 @@ RideSummaryWindow::htmlSummary() const
         }
 
         summary += tr("<h3>Heart Rate Zones</h3>");
-        summary += mainWindow->hrZones()->summarize(rideItem->hrZoneRange(), time_in_zone); //aggregating
+        summary += mainWindow->hrZones()->summarize(hrrange, time_in_zone); //aggregating
     }
 
     // Only get interval summary for a ride summary
@@ -429,7 +467,8 @@ RideSummaryWindow::htmlSummary() const
             bool even = false;
             foreach (RideFileInterval interval, ride->intervals()) {
                 RideFile f(ride->startTime(), ride->recIntSecs());
-                for (int i = ride->intervalBegin(interval); i < ride->dataPoints().size(); ++i) {
+                f.mainwindow = mainWindow; // hack, until we refactor athlete and mainwindow
+                for (int i = ride->intervalBegin(interval); i>=0 && i < ride->dataPoints().size(); ++i) {
                     const RideFilePoint *p = ride->dataPoints()[i];
                     if (p->secs >= interval.stop)
                         break;

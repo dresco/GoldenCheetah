@@ -180,6 +180,15 @@ plot power distribution for a season or month or any number of
 sophisticated date ranges (we also added lots of advance ways to
 express date ranges).
 
+In addition to plotting distribution charts for ride data you can also
+now plot distribution charts for activity metrics. So, for example, you
+can plot a distribution of ride intensity factors to see intensity mix
+for a season or date range. Additionally, you can choose to plot that
+as say ride time, i.e. how much time have I spent over the last season
+at different intensities. Or perhaps you would like to plot TSS that has
+been accumulated over the season by intensity of ride. You can do that
+in version 3.
+
 Lastly, we have also extended the CP curve to plot more than just
 power. It will now plot a mean max curve for HR, Power, Speed, Cadence,
 xPower, NP et al. And we even added VAM too, for you mountain goats.
@@ -270,7 +279,9 @@ Thats not to say that there aren't many other significant contributions
 too; Ale Martinez has masterminded and developed multi-language support
 in V3. Translations have been undertaken by Ale himself, but also by
 Til Schmiedeberg, Keisuke Yamaguchi, Marco Piccirilli, Sergei
-Chekhovskii and Rafael Oliveira Ribeiro.
+Chekhovskii and Rafael Oliveira Ribeiro. And a huge thanks to Satoru
+Kurashiki who has worked tirelessly to get a Debian (and hence Ubuntu)
+package created for GoldenCheetah since v2.1.
 
 A large number of developers have contributed small and large bits of
 code, and many clever coaches and athletes have donated their ideas and
@@ -307,6 +318,6 @@ not be forgotten. Cheers Guys.
 Tag Table:
 Node: Top0
 Node: WHATS NEW310
-Node: CONTRIBUTORS9392
+Node: CONTRIBUTORS9906
 
 End Tag Table

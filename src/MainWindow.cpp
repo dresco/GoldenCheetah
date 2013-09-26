@@ -129,6 +129,9 @@
 #include "WFApi.h"
 #endif
 
+#include "GcUpgrade.h" // upgrade wizard
+#include "GcCrashDialog.h" // recovering from a crash?
+
 // handy spacer
 class Spacer : public QWidget
 {
@@ -144,13 +147,42 @@ QList<MainWindow *> mainwindows; // keep track of all the MainWindows we have op
 QDesktopWidget *desktop = NULL;
 
 MainWindow::MainWindow(const QDir &home) :
-    home(home), session(0), isclean(false), ismultisave(false), isfiltered(false),
+    home(home), session(0), isclean(false), ismultisave(false), init(false), isfiltered(false),
     zones_(new Zones), hrzones_(new HrZones),
     ride(NULL), workout(NULL), groupByMapper(NULL)
 {
+    // who are you?
     cyclist = home.dirName();
     setInstanceName(cyclist);
 
+    //
+    // CRASH PROCESSING
+    //
+
+    // Recovering from a crash?
+    if(!appsettings->cvalue(cyclist, GC_SAFEEXIT, true).toBool()) {
+        GcCrashDialog *crashed = new GcCrashDialog(home);
+        crashed->exec();
+    }
+    appsettings->setCValue(home.dirName(), GC_SAFEEXIT, false); // will be set to true on exit
+
+    //
+    // UPGRADE PROCESSING
+    //
+
+    // Before we initialise we need to run the upgrade wizard
+    GcUpgrade v3;
+    if (v3.upgrade(home) != 0) {
+        hide();
+        QTimer::singleShot(0, this, SLOT(close())); // wait for event loop
+    } else { // don't indent since it would change entire file
+    init=true;
+    // !!! the code below is not indented since it would change the entire
+    //     constructor for this small update. Please bear this in mind
+
+    //
+    // NORMAL PROCESSING (CONSTRUCTOR)
+    //
     #ifdef Q_OS_MAC
     // get an autorelease pool setup
     static CocoaInitializer cocoaInitializer;
@@ -320,10 +352,10 @@ MainWindow::MainWindow(const QDir &home) :
     head->addWidget(viewsel);
 
 #ifdef GC_HAVE_LUCENE
-    SearchFilterBox *searchBox = new SearchFilterBox(this,this);
+    SearchFilterBox *searchBox = new SearchFilterBox(this,this,false);
     QCleanlooksStyle *toolStyle = new QCleanlooksStyle();
     searchBox->setStyle(toolStyle);
-    searchBox->setFixedWidth(250);
+    searchBox->setFixedWidth(300);
     head->addWidget(searchBox);
 #endif
 
@@ -505,7 +537,7 @@ MainWindow::MainWindow(const QDir &home) :
 
 #ifdef GC_HAVE_LUCENE
     // add a search box on far right, but with a little space too
-    SearchFilterBox *searchBox = new SearchFilterBox(this,this);
+    SearchFilterBox *searchBox = new SearchFilterBox(this,this,false);
     searchBox->setStyle(toolStyle);
     searchBox->setFixedWidth(250);
     head->addWidget(searchBox);
@@ -764,6 +796,9 @@ MainWindow::MainWindow(const QDir &home) :
 
     // Chart Settings now in their own dialog box
     chartSettings = new ChartSettings(this, masterControls);
+    chartSettings->setMaximumWidth(450);
+    chartSettings->setMaximumHeight(600);
+
     //toolBox->addItem(masterControls, QIcon(":images/settings.png"), "Chart Settings");
     chartSettings->hide();
 
@@ -858,10 +893,10 @@ MainWindow::MainWindow(const QDir &home) :
     rideMenu->addAction(tr("Down&load from TrainingPeaks..."), this, SLOT(downloadTP()), tr("Ctrl+L"));
 #endif
 
-    stravaAction = new QAction(tr("Upload to Strava..."), this);
-    connect(stravaAction, SIGNAL(triggered(bool)), this, SLOT(uploadStrava()));
-    rideMenu->addAction(stravaAction);
-    rideMenu->addAction(tr("Download from Strava..."), this, SLOT(downloadStrava()));
+    //XXX deprecated stravaAction = new QAction(tr("Upload to Strava..."), this);
+    //XXX deprecated connect(stravaAction, SIGNAL(triggered(bool)), this, SLOT(uploadStrava()));
+    //XXX deprecated rideMenu->addAction(stravaAction);
+    //XXX deprecated rideMenu->addAction(tr("Download from Strava..."), this, SLOT(downloadStrava()));
 
     rideWithGPSAction = new QAction(tr("Upload to RideWithGPS..."), this);
     connect(rideWithGPSAction, SIGNAL(triggered(bool)), this, SLOT(uploadRideWithGPSAction()));
@@ -1001,6 +1036,7 @@ MainWindow::MainWindow(const QDir &home) :
     rideTreeWidgetSelectionChanged();
     selectAnalysis();
     setStyle();
+} // upgrade from first line of constructor
 }
 
 /*----------------------------------------------------------------------
@@ -1106,20 +1142,20 @@ MainWindow::setActivityMenu()
     // enable/disable upload if already uploaded
     if (ride && ride->ride()) {
 
-        QString activityId = ride->ride()->getTag("Strava uploadId", "");
-        if (activityId == "") stravaAction->setEnabled(true);
-        else stravaAction->setEnabled(false);
+        //XXX deprecated QString activityId = ride->ride()->getTag("Strava uploadId", "");
+        //XXX deprecated if (activityId == "") stravaAction->setEnabled(true);
+        //XXX deprecated else stravaAction->setEnabled(false);
 
         QString tripid = ride->ride()->getTag("RideWithGPS tripid", "");
         if (tripid == "") rideWithGPSAction->setEnabled(true);
         else rideWithGPSAction->setEnabled(false);
         
-        activityId = ride->ride()->getTag("TtbExercise", "");
+        QString activityId = ride->ride()->getTag("TtbExercise", "");
         if (activityId == "") ttbAction->setEnabled(true);
         else ttbAction->setEnabled(false);
         
     } else {
-        stravaAction->setEnabled(false);
+        //XXX deprecated stravaAction->setEnabled(false);
         rideWithGPSAction->setEnabled(false);
         ttbAction->setEnabled(false);
     }
@@ -1213,13 +1249,13 @@ MainWindow::rideTreeWidgetSelectionChanged()
     // update the ride property on all widgets
     // to let them know they need to replot new
     // selected ride
+    gcCalendar->setRide(ride);
+    gcMultiCalendar->setRide(ride);
     _rideMetadata->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     analWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     homeWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     diaryWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
     trainWindow->setProperty("ride", QVariant::fromValue<RideItem*>(dynamic_cast<RideItem*>(ride)));
-    gcCalendar->setRide(ride);
-    gcMultiCalendar->setRide(ride);
 
     if (!ride) return;
 
@@ -1475,6 +1511,9 @@ MainWindow::moveEvent(QMoveEvent*)
 void
 MainWindow::closeEvent(QCloseEvent* event)
 {
+    // do nothing on upgrade exit
+    if (init == false) return;
+
     if (saveRideExitDialog() == false) event->ignore();
     else {
 
@@ -1507,6 +1546,10 @@ MainWindow::closeEvent(QCloseEvent* event)
         appsettings->setCValue(cyclist, GC_BLANK_DIARY, blankStateDiaryPage->dontShow->isChecked());
         appsettings->setCValue(cyclist, GC_BLANK_HOME, blankStateHomePage->dontShow->isChecked());
         appsettings->setCValue(cyclist, GC_BLANK_TRAIN, blankStateTrainPage->dontShow->isChecked());
+
+        // set to latest so we don't repeat
+        appsettings->setCValue(home.dirName(), GC_VERSION_USED, VERSION_LATEST);
+        appsettings->setCValue(home.dirName(), GC_SAFEEXIT, true);
 
         // now remove from the list
         if(mainwindows.removeOne(this) == false)
@@ -1947,6 +1990,8 @@ MainWindow::removeCurrentRide()
     if (allRides->childCount() == 0) {
         ride = NULL;
         rideTreeWidgetSelectionChanged(); // notifies children
+        gcCalendar->setRide(ride); // and the pesky calendars
+        gcMultiCalendar->setRide(ride);
     }
 
     treeWidget->setCurrentItem(itemToSelect);
@@ -2138,8 +2183,7 @@ MainWindow::newCyclist()
     QString name = ChooseCyclistDialog::newCyclistDialog(newHome, this);
     if (!name.isEmpty()) {
         newHome.cd(name);
-        if (!newHome.exists())
-            assert(false);
+        if (!newHome.exists()) return;
         MainWindow *main = new MainWindow(newHome);
         main->show();
     }
@@ -2154,8 +2198,7 @@ MainWindow::openCyclist()
     d.setModal(true);
     if (d.exec() == QDialog::Accepted) {
         newHome.cd(d.choice());
-        if (!newHome.exists())
-            assert(false);
+        if (!newHome.exists()) return;
         MainWindow *main = new MainWindow(newHome);
         main->show();
     }

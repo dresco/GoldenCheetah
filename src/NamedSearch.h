@@ -23,6 +23,7 @@
 #include <QXmlDefaultHandler>
 #include <QString>
 #include <QDir>
+class SearchBox;
 
 class NamedSearch
 {
@@ -79,4 +80,37 @@ protected:
     int loadcount;
 
 };
+
+class EditNamedSearches : public QDialog
+{
+    Q_OBJECT
+    G_OBJECT
+
+    public:
+        EditNamedSearches(QWidget *parent, MainWindow *main);
+        void closeEvent(QCloseEvent* event); // write away on save
+        void writeSearches();
+
+    public slots:
+        void reject(); // write away on close
+
+    private:
+        MainWindow *mainWindow;
+        bool active;
+        QLineEdit *editName;
+        SearchBox *editSearch;
+        QTreeWidget *searchList;
+        QPushButton *addButton,
+                    *updateButton,
+                    *deleteButton;
+        QIcon searchIcon, filterIcon;
+
+    private slots:
+        void addClicked();
+        void updateClicked();
+        void deleteClicked();
+        void selectionChanged();
+};
+
+
 #endif

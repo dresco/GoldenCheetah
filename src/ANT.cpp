@@ -72,6 +72,9 @@ const ant_sensor_type_t ANT::ant_sensor_types[] = {
 //
 ANT::ANT(QObject *parent, DeviceConfiguration *devConf) : QThread(parent), devConf(devConf)
 {
+    qRegisterMetaType<ANTMessage>("ANTMessage");
+    qRegisterMetaType<struct timeval>("struct timeval");
+
     // device status and settings
     Status=0;
     deviceFilename = devConf ? devConf->portSpec : "";
@@ -145,8 +148,8 @@ void ANT::setWheelRpm(float x) {
 
     // devConf will be NULL if we are are running the add device wizard
     // we can default to the global setting
-    if (devConf) telemetry.setSpeed(x * (devConf->wheelSize/1000) * 60 / 1000);
-    else telemetry.setSpeed(x * (appsettings->value(NULL, GC_WHEELSIZE, 2100).toInt()/1000) * 60 / 1000);
+    if (devConf) telemetry.setSpeed(x * devConf->wheelSize / 1000 * 60 / 1000);
+    else telemetry.setSpeed(x * appsettings->value(NULL, GC_WHEELSIZE, 2100).toInt() / 1000 * 60 / 1000);
 }
 
 /*======================================================================
@@ -173,35 +176,9 @@ void ANT::run()
 
     if (openPort() == 0) {
 
-        sendMessage(ANTMessage::resetSystem());
-        sendMessage(ANTMessage::setNetworkKey(1, key));
-
-        // pair with specified devices on next available channel
-        if (antIDs.count()) {
-
-            foreach(QString antid, antIDs) {
-
-                if (antid.length()) {
-                    unsigned char c = antid.at(antid.length()-1).toLatin1();
-                    int ch_type = interpretSuffix(c);
-                    int device_number = antid.mid(0, antid.length()-1).toInt();
-
-                    addDevice(device_number, ch_type, -1);
-                }
-           }
-
-        } else {
-
-            if (!configuring) {
-                // not configured, just pair with whatever you can find
-                addDevice(0, ANTChannel::CHANNEL_TYPE_SPEED, 0);
-                addDevice(0, ANTChannel::CHANNEL_TYPE_POWER, 1);
-                addDevice(0, ANTChannel::CHANNEL_TYPE_CADENCE, 2);
-                addDevice(0, ANTChannel::CHANNEL_TYPE_HR, 3);
-
-                if (channels > 4) addDevice(0, ANTChannel::CHANNEL_TYPE_SandC, 4);
-            }
-        }
+        // Moved early setup code (reset, network key, device pairing) to ANT::setup() so that
+        // the receive loop is already running when these early messages are transmitted. This
+        // will enable us to check responses to these messages in the future.
 
     } else {
         quit(0);
@@ -242,6 +219,50 @@ int
 ANT::start()
 {
     QThread::start();
+    return 0;
+}
+
+int
+ANT::setup()
+{
+    // Give the thread a chance to start.
+    // fixme: better synchronisation?
+    msleep(500);
+
+    sendMessage(ANTMessage::resetSystem());
+
+    // specs say wait 500ms after reset before sending any more host commands
+    msleep(500);
+
+    sendMessage(ANTMessage::setNetworkKey(1, key));
+
+    // pair with specified devices on next available channel
+    if (antIDs.count()) {
+
+        foreach(QString antid, antIDs) {
+
+            if (antid.length()) {
+                unsigned char c = antid.at(antid.length()-1).toLatin1();
+                int ch_type = interpretSuffix(c);
+                int device_number = antid.mid(0, antid.length()-1).toInt();
+
+                addDevice(device_number, ch_type, -1);
+            }
+        }
+
+    } else {
+
+        if (!configuring) {
+            // not configured, just pair with whatever you can find
+            addDevice(0, ANTChannel::CHANNEL_TYPE_SPEED, 0);
+            addDevice(0, ANTChannel::CHANNEL_TYPE_POWER, 1);
+            addDevice(0, ANTChannel::CHANNEL_TYPE_CADENCE, 2);
+            addDevice(0, ANTChannel::CHANNEL_TYPE_HR, 3);
+
+            if (channels > 4) addDevice(0, ANTChannel::CHANNEL_TYPE_SandC, 4);
+        }
+    }
+
     return 0;
 }
 
@@ -292,13 +313,27 @@ ANT::pause()
 int
 ANT::stop()
 {
+    // Close the connections to ANT devices before we stop. Sending the
+    // "close channel" ANT message seems to resolve an intermittent
+    // issue of unresponsive USB2 stick on subsequent opens.
+
+    if (antIDs.count()) {
+        foreach(QString antid, antIDs) {
+            if (antid.length()) {
+                unsigned char c = antid.at(antid.length()-1).toLatin1();
+                int ch_type = interpretSuffix(c);
+                int device_number = antid.mid(0, antid.length()-1).toInt();
+
+                removeDevice(device_number, ch_type);
+            }
+        }
+    }
+
     // what state are we in anyway?
     pvars.lock();
     Status = 0; // Terminate it!
     pvars.unlock();
 
-    // Signal to stop logging
-    emit receivedAntMessage(NULL, NULL);
     return 0;
 }
 
@@ -307,6 +342,9 @@ ANT::quit(int code)
 {
     // event code goes here!
     closePort();
+
+    // Signal to stop logging. Moved to the end of the reading thread to
+    // ensure no more messages can arrive and re-open the log file.
     exit(code);
     return 0;
 }
@@ -674,7 +712,7 @@ ANT::processMessage(void) {
 
     struct timeval timestamp;
     gettimeofday (&timestamp, NULL);
-    emit receivedAntMessage(&m, &timestamp);
+    emit receivedAntMessage(m, timestamp);
 
     switch (rxMessage[ANT_OFFSET_ID]) {
         case ANT_ACK_DATA:

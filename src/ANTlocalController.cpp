@@ -31,7 +31,7 @@ ANTlocalController::ANTlocalController(TrainTool *parent, DeviceConfiguration *d
     connect(myANTlocal, SIGNAL(searchTimeout(int)), this, SIGNAL(searchTimeout(int)));
 
     // Connect a logger
-    connect(myANTlocal, SIGNAL(receivedAntMessage(const ANTMessage *,const timeval *)), &logger, SLOT(logRawAntMessage(const ANTMessage *,const timeval *)));
+    connect(myANTlocal, SIGNAL(receivedAntMessage(const ANTMessage ,const timeval )), &logger, SLOT(logRawAntMessage(const ANTMessage ,const timeval)));
 }
 
 void
@@ -43,7 +43,9 @@ ANTlocalController::setDevice(QString device)
 int
 ANTlocalController::start()
 {
+    logger.open();
     myANTlocal->start();
+    myANTlocal->setup();
     return 0;
 }
 
@@ -65,7 +67,9 @@ ANTlocalController::pause()
 int
 ANTlocalController::stop()
 {
-    return myANTlocal->stop();
+    int rc =  myANTlocal->stop();
+    logger.close();
+    return rc;
 }
 
 bool
@@ -101,6 +105,7 @@ ANTlocalController::getRealtimeData(RealtimeData &rtData)
         msgBox.setIcon(QMessageBox::Critical);
         msgBox.exec();
         parent->Stop(1);
+        logger.close();
         return;
     }
     // get latest telemetry

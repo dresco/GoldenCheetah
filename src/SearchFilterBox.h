@@ -30,11 +30,12 @@ class SearchFilterBox : public QWidget
     Q_OBJECT
 
 public:
-    SearchFilterBox(QWidget *parent, MainWindow *main);
+    SearchFilterBox(QWidget *parent, MainWindow *main, bool nochooser = true);
     void setMode(SearchBox::SearchBoxMode x) { searchbox->setMode(x); }
 
     QString filter();
     void setFilter(QString); // filter:text or search:text
+    bool isFiltered() const { return searchbox->isFiltered(); }
 
 private slots:
 

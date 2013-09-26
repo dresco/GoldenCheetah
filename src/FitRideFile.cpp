@@ -22,7 +22,7 @@
 #include <QSet>
 #include <QtEndian>
 #include <QDebug>
-#include <assert.h>
+#include <QTime>
 #include <stdio.h>
 #include <stdint.h>
 #include <limits>
@@ -423,9 +423,9 @@ struct FitFileReaderState
             // Evil smart recording.  Linearly interpolate missing points.
             RideFilePoint *prevPoint = rideFile->dataPoints().back();
             int deltaSecs = (int) (secs - prevPoint->secs);
-            assert(deltaSecs == secs - prevPoint->secs); // no fractional part
+            //assert(deltaSecs == secs - prevPoint->secs); // no fractional part -- don't CRASH FFS, be graceful
             // This is only true if the previous record was of type record:
-            assert(deltaSecs == time - last_time);
+            //assert(deltaSecs == time - last_time); -- don't CRASH FFS, be graceful
             // If the last lat/lng was missing (0/0) then all points up to lat/lng are marked as 0/0.
             if (prevPoint->lat == 0 && prevPoint->lon == 0 ) {
                 badgps = 1;
@@ -444,26 +444,32 @@ struct FitFileReaderState
             double deltaSlope = headwind - prevPoint->slope;
             double deltaLeftRightBalance = lrbalance - prevPoint->lrbalance;
 
-            for (int i = 1; i < deltaSecs; i++) {
-                double weight = 1.0 * i / deltaSecs;
-                rideFile->appendPoint(
-                    prevPoint->secs + (deltaSecs * weight),
-                    prevPoint->cad + (deltaCad * weight),
-                    prevPoint->hr + (deltaHr * weight),
-                    prevPoint->km + (deltaDist * weight),
-                    prevPoint->kph + (deltaSpeed * weight),
-                    prevPoint->nm + (deltaTorque * weight),
-                    prevPoint->watts + (deltaPower * weight),
-                    prevPoint->alt + (deltaAlt * weight),
-                    (badgps == 1) ? 0 : prevPoint->lon + (deltaLon * weight),
-                    (badgps == 1) ? 0 : prevPoint->lat + (deltaLat * weight),
-                    prevPoint->headwind + (deltaHeadwind * weight),
-                    prevPoint->slope + (deltaSlope * weight),
-                    temperature,
-                    prevPoint->lrbalance + (deltaLeftRightBalance * weight),
-                    interval);
+            // only smooth for less than 30 minutes
+            // we don't want to crash / stall on bad
+            // or corrupt files
+            if (deltaSecs > 0 && deltaSecs < (60*30)) {
+
+                for (int i = 1; i < deltaSecs; i++) {
+                    double weight = 1.0 * i / deltaSecs;
+                    rideFile->appendPoint(
+                        prevPoint->secs + (deltaSecs * weight),
+                        prevPoint->cad + (deltaCad * weight),
+                        prevPoint->hr + (deltaHr * weight),
+                        prevPoint->km + (deltaDist * weight),
+                        prevPoint->kph + (deltaSpeed * weight),
+                        prevPoint->nm + (deltaTorque * weight),
+                        prevPoint->watts + (deltaPower * weight),
+                        prevPoint->alt + (deltaAlt * weight),
+                        (badgps == 1) ? 0 : prevPoint->lon + (deltaLon * weight),
+                        (badgps == 1) ? 0 : prevPoint->lat + (deltaLat * weight),
+                        prevPoint->headwind + (deltaHeadwind * weight),
+                        prevPoint->slope + (deltaSlope * weight),
+                        temperature,
+                        prevPoint->lrbalance + (deltaLeftRightBalance * weight),
+                        interval);
+                }
+                prevPoint = rideFile->dataPoints().back();
             }
-            prevPoint = rideFile->dataPoints().back();
         }
 
         if (km < 0.00001f) km = last_distance;
@@ -586,6 +592,7 @@ struct FitFileReaderState
         int header_size = read_uint8();
         if (header_size != 12 && header_size != 14) {
             errors << QString("bad header size: %1").arg(header_size);
+            file.close();
             delete rideFile;
             return NULL;
         }
@@ -601,12 +608,14 @@ struct FitFileReaderState
         char fit_str[5];
         if (file.read(fit_str, 4) != 4) {
             errors << "truncated header";
+            file.close();
             delete rideFile;
             return NULL;
         }
         fit_str[4] = '\0';
         if (strcmp(fit_str, ".FIT") != 0) {
             errors << QString("bad header, expected \".FIT\" but got \"%1\"").arg(fit_str);
+            file.close();
             delete rideFile;
             return NULL;
         }
@@ -622,10 +631,12 @@ struct FitFileReaderState
         }
         catch (TruncatedRead &e) {
             errors << "truncated file body";
+            file.close();
             delete rideFile;
             return NULL;
         }
         if (stop) {
+            file.close();
             delete rideFile;
             return NULL;
         }
@@ -639,6 +650,7 @@ struct FitFileReaderState
             foreach(int num, unknown_base_type)
                 qDebug() << QString("FitRideFile: unknown base type %1; skipped").arg(num);
 
+            file.close();
             return rideFile;
         }
     }

@@ -259,7 +259,7 @@ signals:
     void searchTimeout(int channel);         // searchTimeount
     void searchComplete(int channel);         // searchComplete
     void signalStrength(int channel, double reliability);
-    void receivedAntMessage(const ANTMessage *message, const struct timeval *timestamp);
+    void receivedAntMessage(const ANTMessage message, const struct timeval timestamp);
 
 public slots:
 
@@ -271,6 +271,7 @@ public slots:
     int quit(int error);                        // called by thread before exiting
 
     // configuration and channel management
+    int setup();                                // reset system, network key and device pairing - moved out of start()
     bool isConfiguring() { return configuring; }
     void setConfigurationMode(bool x) { configuring = x; }
     void setChannel(int channel, int device_number, int channel_type) {
@@ -394,5 +395,8 @@ private:
     QQueue<setChannelAtom> channelQueue; // messages for configuring channels from controller
 
 };
+
+#include "ANTMessage.h"
+#include "ANTChannel.h"
 
 #endif

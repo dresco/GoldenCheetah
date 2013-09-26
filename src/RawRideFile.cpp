@@ -19,7 +19,6 @@
 #include "RawRideFile.h"
 #include "PowerTapUtil.h"
 #include "Units.h"
-#include <assert.h>
 #include <math.h>
 
 static int rawFileReaderRegistered =
@@ -50,8 +49,8 @@ config_cb(unsigned interval, double rec_int_secs,
     ReadState *state = (ReadState*) context;
     // Assume once set, rec_int should never change.
     //double recIntSecs = rec_int * 1.26;
-    assert((state->rideFile->recIntSecs() == 0.0)
-           || (state->rideFile->recIntSecs() == rec_int_secs));
+    // ACTUALLY LETS NOT, IF IT CHANGES ITS NOT A REASON TO FUCKING CRASH
+    //assert((state->rideFile->recIntSecs() == 0.0) || (state->rideFile->recIntSecs() == rec_int_secs));
     state->rideFile->setRecIntSecs(rec_int_secs);
 }
 
@@ -215,9 +214,21 @@ RideFile *RawFileReader::openRideFile(QFile &file, QStringList &errors, QList<Ri
         return NULL;
     }
     FILE *f = fdopen(file.handle(), "r");
-    assert(f);
+
+    // failed to associate a stream!
+    if (f==NULL) {
+        file.close();
+        delete rideFile;
+        return NULL;
+    }
+
     ReadState state(rideFile, errors);
     pt_read_raw(f, &state, config_cb, time_cb, data_cb, error_cb);
+    file.close();
+    // fclose can handle the file being closed already, QFile crashes on Windows
+    // we need to do both because fclose needs to release its stream buffers and
+    // fclose maintains local state that causes a crash when out of sync on Windows
+    fclose(f);
     return rideFile;
 }
 

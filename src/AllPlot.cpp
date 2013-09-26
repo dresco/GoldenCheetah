@@ -27,7 +27,6 @@
 #include "Zones.h"
 #include "Colors.h"
 
-#include <assert.h>
 #include <qwt_plot_curve.h>
 #include <qwt_plot_intervalcurve.h>
 #include <qwt_plot_grid.h>
@@ -147,7 +146,7 @@ class AllPlotZoneLabel: public QwtPlotItem
                 QList <int> zone_lows = zones->getZoneLows(zone_range);
                 QList <QString> zone_names = zones->getZoneNames(zone_range);
                 int num_zones = zone_lows.size();
-                assert(zone_names.size() == num_zones);
+                if (zone_names.size() != num_zones) return;
                 if (zone_number < num_zones) {
                     watts =
                         (
@@ -390,7 +389,7 @@ AllPlot::configChanged()
     ihlPen.setWidth(width);
     intervalHighlighterCurve->setPen(ihlPen);
     QColor ihlbrush = QColor(GColor(CINTERVALHIGHLIGHTER));
-    ihlbrush.setAlpha(64);
+    ihlbrush.setAlpha(128);
     intervalHighlighterCurve->setBrush(ihlbrush);   // fill below the line
     //this->legend()->remove(intervalHighlighterCurve); // don't show in legend
     QPen gridPen(GColor(CPLOTGRID));
@@ -863,7 +862,7 @@ AllPlot::setYMax()
         }
 
         QwtValueList xytick[QwtScaleDiv::NTickTypes];
-        for (int i=0;i<maxY;i+=step)
+        for (int i=0;i<maxY && i<2000;i+=step)
             xytick[QwtScaleDiv::MajorTick]<<i;
 
         setAxisTitle(yLeft, tr("Watts"));

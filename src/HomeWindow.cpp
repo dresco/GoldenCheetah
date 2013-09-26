@@ -239,7 +239,8 @@ HomeWindow::titleChanged()
 void
 HomeWindow::rideSelected()
 {
-    if (amVisible()) {
+    // we need to notify of null rides immediately
+    if (!myRideItem || amVisible()) {
         for (int i=0; i < charts.count(); i++) {
 
             // show if its not a tab
@@ -647,10 +648,15 @@ HomeWindow::resetLayout()
     }
     restoreState(true);
     for(int i = 0; i < charts.count(); i++) {
-        charts[i]->show();
+        RideItem *notconst = (RideItem*)mainWindow->currentRideItem();
+        charts[i]->setProperty("ride", QVariant::fromValue<RideItem*>(notconst));
+        DateRange dr = mainWindow->currentDateRange();
+        charts[i]->setProperty("dateRange", QVariant::fromValue<DateRange>(dr));
+        if (currentStyle != 0) charts[i]->show();
+        
     }
     setUpdatesEnabled(true);
-    update();
+    if (currentStyle == 0 && charts.count()) tabSelected(0);
 }
 
 void
@@ -1023,6 +1029,7 @@ GcWindowDialog::GcWindowDialog(GcWinID type, MainWindow *mainWindow) : mainWindo
 
     win = GcWindowRegistry::newGcWindow(type, mainWindow);
     chartLayout->addWidget(win);
+    //win->setFrameStyle(QFrame::Box);
 
     // lets not have space for controls if there aren't any
     layout->setStretch(0, 100);

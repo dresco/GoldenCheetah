@@ -132,7 +132,7 @@ int LibUsb::read(char *buf, int bytes)
     readBufSize = 0;
     readBufIndex = 0;
 
-    int rc = usb_bulk_read(device, readEndpoint, readBuf, 64, 10);
+    int rc = usb_bulk_read(device, readEndpoint, readBuf, 64, 125);
     if (rc < 0)
     {
         // don't report timeouts - lots of noise so commented out
@@ -357,7 +357,8 @@ bool LibUsb::findAntStick()
 
         for (dev = bus->devices; dev; dev = dev->next) {
 
-            if (dev->descriptor.idVendor == GARMIN_USB2_VID && dev->descriptor.idProduct == GARMIN_USB2_PID) {
+            if (dev->descriptor.idVendor == GARMIN_USB2_VID && 
+                (dev->descriptor.idProduct == GARMIN_USB2_PID || dev->descriptor.idProduct == GARMIN_OEM_PID)) {
                 found = true;
             }
         }
@@ -377,7 +378,8 @@ struct usb_dev_handle* LibUsb::OpenAntStick()
 
         for (dev = bus->devices; dev; dev = dev->next) {
 
-            if (dev->descriptor.idVendor == GARMIN_USB2_VID && dev->descriptor.idProduct == GARMIN_USB2_PID) {
+            if (dev->descriptor.idVendor == GARMIN_USB2_VID &&
+                (dev->descriptor.idProduct == GARMIN_USB2_PID || dev->descriptor.idProduct == GARMIN_OEM_PID)) {
 
                 if ((udev = usb_open(dev))) {
                     usb_reset(udev);
@@ -392,7 +394,8 @@ struct usb_dev_handle* LibUsb::OpenAntStick()
 
         for (dev = bus->devices; dev; dev = dev->next) {
 
-            if (dev->descriptor.idVendor == GARMIN_USB2_VID && dev->descriptor.idProduct == GARMIN_USB2_PID) {
+            if (dev->descriptor.idVendor == GARMIN_USB2_VID && 
+                (dev->descriptor.idProduct == GARMIN_USB2_PID || dev->descriptor.idProduct == GARMIN_OEM_PID)) {
 
                 //Avoid noisy output
                 //qDebug() << "Found a Garmin USB2 ANT+ stick";
@@ -402,6 +405,10 @@ struct usb_dev_handle* LibUsb::OpenAntStick()
                     if (dev->descriptor.bNumConfigurations) {
 
                         if ((intf = usb_find_interface(&dev->config[0])) != NULL) {
+
+#ifdef Q_OS_LINUX
+                            usb_detach_kernel_driver_np(udev, interface);
+#endif
 
                             int rc = usb_set_configuration(udev, 1);
                             if (rc < 0) {

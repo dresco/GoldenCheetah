@@ -19,6 +19,7 @@
 #include "SearchBox.h"
 #include "MainWindow.h"
 #include "NamedSearch.h"
+#include "RideNavigator.h"
 #include "GcSideBarItem.h"
 #include <QToolButton>
 #include <QInputDialog>
@@ -27,8 +28,8 @@
 #include <QMenu>
 #include <QDebug>
 
-SearchBox::SearchBox(MainWindow *main, QWidget *parent)
-    : QLineEdit(parent), main(main)
+SearchBox::SearchBox(MainWindow *main, QWidget *parent, bool nochooser)
+    : QLineEdit(parent), main(main), filtered(false), nochooser(nochooser)
 {
     setFixedHeight(21);
     //clear button
@@ -50,6 +51,11 @@ SearchBox::SearchBox(MainWindow *main, QWidget *parent)
     toolButton->setCursor(Qt::ArrowCursor);
     toolButton->setPopupMode(QToolButton::InstantPopup);
 
+    dropMenu = new QMenu(this);
+    toolButton->setMenu(dropMenu);
+    connect(dropMenu, SIGNAL(aboutToShow()), this, SLOT(setMenu()));
+    connect(dropMenu, SIGNAL(triggered(QAction*)), this, SLOT(runMenu(QAction*)));
+
     // search button
     searchButton = new QToolButton(this);
     QIcon search = iconFromPNG(":images/toolbar/search3.png", false);
@@ -58,11 +64,6 @@ SearchBox::SearchBox(MainWindow *main, QWidget *parent)
     searchButton->setIconSize(QSize(11,11));
     searchButton->setCursor(Qt::ArrowCursor);
     connect(searchButton, SIGNAL(clicked()), this, SLOT(toggleMode()));
-
-    dropMenu = new QMenu(this);
-    toolButton->setMenu(dropMenu);
-    connect(dropMenu, SIGNAL(aboutToShow()), this, SLOT(setMenu()));
-    connect(dropMenu, SIGNAL(triggered(QAction*)), this, SLOT(runMenu(QAction*)));
 
     int frameWidth = style()->pixelMetric(QStyle::PM_DefaultFrameWidth);
 #ifdef Q_OS_MAC
@@ -163,6 +164,7 @@ void SearchBox::searchSubmit()
 {
     // return hit / key pressed
     if (text() != "") {
+        filtered = true;
         mode == Search ? submitQuery(text()) : submitFilter(text());
     }
 }
@@ -170,6 +172,7 @@ void SearchBox::searchSubmit()
 void SearchBox::clearClicked()
 {
     setText("");
+    filtered = false;
     //mode == Search ? clearQuery() : clearFilter();
     setGood();
 }
@@ -183,20 +186,32 @@ void SearchBox::checkMenu()
 void SearchBox::setMenu()
 {
     dropMenu->clear();
-    if (text() != "") dropMenu->addAction(tr("Add Favourite"));
+    if (text() != "") dropMenu->addAction(tr("Add to Favourites"));
     if (main->namedSearches->getList().count()) {
-        dropMenu->addSeparator();
+        if (text() != "") dropMenu->addSeparator();
         foreach(NamedSearch x, main->namedSearches->getList()) {
             dropMenu->addAction(x.name);
         }
+        dropMenu->addSeparator();
+        dropMenu->addAction(tr("Manage Favourites"));
     }
+    if (!nochooser) dropMenu->addAction(tr("Column Chooser"));
 }
 
 void SearchBox::runMenu(QAction *x)
 {
     // just qdebug for now
-    if (x->text() == tr("Add Favourite")) addNamed();
-    else {
+    if (x->text() == tr("Add to Favourites")) addNamed();
+    else if (x->text() == tr("Manage Favourites")) {
+
+        EditNamedSearches *editor = new EditNamedSearches(this, main);
+        editor->move(QCursor::pos()-QPoint(230,-5));
+        editor->show();
+
+    } else if (x->text() == tr("Column Chooser")) {
+        ColumnChooser *selector = new ColumnChooser(main->listView->logicalHeadings);
+        selector->show();
+    } else {
         NamedSearch get = main->namedSearches->get(x->text());
         if (get.name == x->text()) {
             setMode(static_cast<SearchBox::SearchBoxMode>(get.type));
@@ -244,7 +259,7 @@ SearchBox::dropEvent(QDropEvent *event)
 
     // we do very little to the name, just space to _ and lower case it for now...
     name.replace(' ', '_');
-    insert(name + (mode == Search ? ":\"\"" : ""));
+    insert(name);
 }
 
 void

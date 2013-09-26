@@ -16,7 +16,6 @@
  * Franklin Street, Fifth Floor, Boston, MA  02110-1301  USA
  */
 
-#include <assert.h>
 #include <QDebug>
 #include "RideItem.h"
 #include "RideFile.h"
@@ -469,7 +468,7 @@ RideImportWizard::process()
 
    cancelButton->setHidden(false);
    todayButton->setHidden(false);
-   overFiles->setHidden(false);
+   //overFiles->setHidden(false); // deprecate for this release... XXX
 
    if (needdates == 0) {
       // no need to wait for the user to input dates
@@ -495,7 +494,7 @@ RideImportWizard::process()
 void
 RideImportWizard::overClicked()
 {
-    overwriteFiles = overFiles->isChecked();
+    //overwriteFiles = overFiles->isChecked(); //deprecate in this release XXX
 }
 
 void
@@ -742,7 +741,7 @@ RideImportWizard::abortClicked()
     aborted = false;
     cancelButton->setHidden(true);
     todayButton->setHidden(true);
-    overFiles->setHidden(true);
+    //overFiles->setHidden(true);  // deprecate for this release XXX
 
     // now set this fields uneditable again ... yeesh.
     for (int i=0; i <filenames.count(); i++) {

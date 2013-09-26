@@ -295,11 +295,11 @@ CredentialsPage::CredentialsPage(QWidget *parent, MainWindow *mainWindow) : QScr
     QLabel *twauthLabel = new QLabel(tr("Authorise"));
     QLabel *twpinLabel = new QLabel(tr("PIN"));
 
-    QLabel *str = new QLabel(tr("Strava"));
-    str->setFont(current);
+    //XXX deprecated QLabel *str = new QLabel(tr("Strava"));
+    //XXX deprecated str->setFont(current);
 
-    QLabel *struserLabel = new QLabel(tr("Username"));
-    QLabel *strpassLabel = new QLabel(tr("Password"));
+    //XXX deprecated QLabel *struserLabel = new QLabel(tr("Username"));
+    //XXX deprecated QLabel *strpassLabel = new QLabel(tr("Password"));
 
     QLabel *rwgps = new QLabel(tr("RideWithGPS"));
     rwgps->setFont(current);
@@ -375,12 +375,12 @@ CredentialsPage::CredentialsPage(QWidget *parent, MainWindow *mainWindow) : QScr
     twitterPIN = new QLineEdit(this);
     twitterPIN->setText("");
 
-    stravaUser = new QLineEdit(this);
-    stravaUser->setText(appsettings->cvalue(mainWindow->cyclist, GC_STRUSER, "").toString());
+    //XXX deprecated stravaUser = new QLineEdit(this);
+    //XXX deprecated stravaUser->setText(appsettings->cvalue(mainWindow->cyclist, GC_STRUSER, "").toString());
 
-    stravaPass = new QLineEdit(this);
-    stravaPass->setEchoMode(QLineEdit::Password);
-    stravaPass->setText(appsettings->cvalue(mainWindow->cyclist, GC_STRPASS, "").toString());
+    //XXX deprecated stravaPass = new QLineEdit(this);
+    //XXX deprecated stravaPass->setEchoMode(QLineEdit::Password);
+    //XXX deprecated stravaPass->setText(appsettings->cvalue(mainWindow->cyclist, GC_STRPASS, "").toString());
 
     rideWithGPSUser = new QLineEdit(this);
     rideWithGPSUser->setText(appsettings->cvalue(mainWindow->cyclist, GC_RWGPSUSER, "").toString());
@@ -443,9 +443,9 @@ CredentialsPage::CredentialsPage(QWidget *parent, MainWindow *mainWindow) : QScr
     grid->addWidget(twurlLabel, 10,0);
     grid->addWidget(twauthLabel, 11,0);
     grid->addWidget(twpinLabel, 12,0);
-    grid->addWidget(str, 13,0);
-    grid->addWidget(struserLabel, 14,0);
-    grid->addWidget(strpassLabel, 15,0);
+    //XXX deprecated grid->addWidget(str, 13,0);
+    //XXX deprecated grid->addWidget(struserLabel, 14,0);
+    //XXX deprecated grid->addWidget(strpassLabel, 15,0);
     grid->addWidget(rwgps, 17,0);
     grid->addWidget(rwgpsuserLabel, 18,0);
     grid->addWidget(rwgpspassLabel, 19,0);
@@ -480,8 +480,8 @@ CredentialsPage::CredentialsPage(QWidget *parent, MainWindow *mainWindow) : QScr
     grid->addWidget(twitterAuthorise, 11, 1, Qt::AlignLeft | Qt::AlignVCenter);
     grid->addWidget(twitterPIN, 12, 1, Qt::AlignLeft | Qt::AlignVCenter);
 
-    grid->addWidget(stravaUser, 14, 1, Qt::AlignLeft | Qt::AlignVCenter);
-    grid->addWidget(stravaPass, 15, 1, Qt::AlignLeft | Qt::AlignVCenter);
+    //XXX grid->addWidget(stravaUser, 14, 1, Qt::AlignLeft | Qt::AlignVCenter);
+    //XXX grid->addWidget(stravaPass, 15, 1, Qt::AlignLeft | Qt::AlignVCenter);
 
     grid->addWidget(rideWithGPSUser, 18, 1, Qt::AlignLeft | Qt::AlignVCenter);
     grid->addWidget(rideWithGPSPass, 19, 1, Qt::AlignLeft | Qt::AlignVCenter);
@@ -525,8 +525,8 @@ CredentialsPage::saveClicked()
     appsettings->setCValue(mainWindow->cyclist, GC_TPURL, tpURL->text());
     appsettings->setCValue(mainWindow->cyclist, GC_TPUSER, tpUser->text());
     appsettings->setCValue(mainWindow->cyclist, GC_TPPASS, tpPass->text());
-    appsettings->setCValue(mainWindow->cyclist, GC_STRUSER, stravaUser->text());
-    appsettings->setCValue(mainWindow->cyclist, GC_STRPASS, stravaPass->text());
+    //XXX deprecated appsettings->setCValue(mainWindow->cyclist, GC_STRUSER, stravaUser->text());
+    //XXX deprecated appsettings->setCValue(mainWindow->cyclist, GC_STRPASS, stravaPass->text());
     appsettings->setCValue(mainWindow->cyclist, GC_RWGPSUSER, rideWithGPSUser->text());
     appsettings->setCValue(mainWindow->cyclist, GC_RWGPSPASS, rideWithGPSPass->text());
     appsettings->setCValue(mainWindow->cyclist, GC_TTBUSER, ttbUser->text());
@@ -547,6 +547,7 @@ CredentialsPage::saveClicked()
     appsettings->setCValue(mainWindow->cyclist, GC_DVURL, url);
     appsettings->setCValue(mainWindow->cyclist, GC_DVUSER, dvUser->text());
     appsettings->setCValue(mainWindow->cyclist, GC_DVPASS, dvPass->text());
+
     saveTwitter(); // get secret key if PIN set
 }
 
