@@ -51,9 +51,17 @@
 // 2             Buttons - 0x01 = Enter, 0x02 = Minus, 0x04 = Plus, 0x08 = Cancel
 // 3             Target motor position (1 to 100)
 // 4             Current motor position (1 to 100)
-// 5             0x00 -- UNUSED
-// 6             0x00 -- UNUSED
-// 7             0x00 -- UNUSED
+// 5             Realtime speed - Lo Byte
+// 6             Realtime speed - Hi Byte
+// 7             Realtime power - Lo Byte
+// 8             Realtime power - Hi Byte
+// 9             0x00 -- UNUSED
+// 10            0x00 -- UNUSED
+// 11            0x00 -- UNUSED
+// 12            0x00 -- UNUSED
+// 13            0x00 -- UNUSED
+// 14            0x00 -- UNUSED
+// 15            0x00 -- UNUSED
 
 
 
@@ -324,7 +332,16 @@ void BudgetTrainer::run()
             this->deviceButtons = curButtons = buttons = buf[2];
             this->deviceResistance = curResistance = resistance = buf[4];
             pvars.unlock();
+
+            // test getting speed and power back from the trainer
+            double temp;
+            temp = (double)(qFromLittleEndian<quint16>(&buf[5]) / 10.0);
+            qDebug() << "Device speed" << temp;
+            temp = (double)(qFromLittleEndian<quint16>(&buf[7]) / 10.0);
+            qDebug() << "Device power" << temp;
         }
+        else
+        	qDebug() <<"ReadMessage() Error";
 
         //----------------------------------------------------------------
         // LISTEN TO GUI CONTROL COMMANDS
@@ -602,7 +619,12 @@ int BudgetTrainer::readMessage()
     if (i > 0)
     {
         if ((buf[0] == 0xAA) && buf[1] == 0x01)
+        {
+            // todo: handle this situation better, possibly means we're out of sync
+            //       and receiving part way though a packet? read in the remaining
+            //       bytes until we get back in sync?
             return i;
+        }
     }
     return -1;
 }
