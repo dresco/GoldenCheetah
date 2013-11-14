@@ -155,6 +155,12 @@ uint8_t BudgetTrainer::getButtons()
     int  tmp;
     pvars.lock();
     tmp = this->deviceButtons;
+
+    // Work around to ensure controller doesn't miss button press.
+    // The run thread will only set the button bits, they don't get
+    // reset until the ui reads the device state
+    this->deviceButtons = 0;
+
     pvars.unlock();
     return tmp;
 }
@@ -285,7 +291,7 @@ void BudgetTrainer::run()
     int curmode; //, curstatus;
     double curload, curgradient;
     double curwatts = 0, curspeed = 0;
-    uint8_t buttons = 0, resistance = 0;
+    //uint8_t buttons = 0, resistance = 0;
 
 //    double curPower;                      // current output power in Watts
 //    double curHeartRate;                  // current heartrate in BPM
@@ -301,7 +307,8 @@ void BudgetTrainer::run()
     curgradient = this->gradient;
     curspeed = this->speed;
     curwatts = this->watts;
-    this->deviceButtons = 0;
+    curButtons = this->deviceButtons = 0;
+    curResistance = this->deviceResistance = 0;
     pvars.unlock();
 
     // open the device
@@ -328,9 +335,13 @@ void BudgetTrainer::run()
 
         // get some telemetry back...
         if (readMessage() > 0) {
+
+            curButtons = buf[2];
+            curResistance = buf[4];
+
             pvars.lock();
-            this->deviceButtons = curButtons = buttons = buf[2];
-            this->deviceResistance = curResistance = resistance = buf[4];
+            this->deviceButtons |= curButtons;              // workaround to ensure controller doesn't miss button pushes
+            this->deviceResistance = curResistance;
             pvars.unlock();
 
             // test getting speed and power back from the trainer
@@ -369,14 +380,10 @@ void BudgetTrainer::run()
         qDebug() << "Speed " << curspeed;
         qDebug() << "Watts" << curwatts;
         qDebug() << "Mode " << mode;
-        qDebug() << "Buttons " << buttons;
-        qDebug() << "Resistance " << resistance;
+        qDebug() << "Buttons " << curButtons;
+        qDebug() << "Resistance " << curResistance;
 
-        // Note that there is an interaction with the frequency that BudgetTrainerController:getRealTimeData
-        // is called from TrainTool::GuiUpdate. As the BudgetTrainer firmware only passes the lap button event
-        // once (to avoid multiple increments), if we retrieve the state here multiple times between each iteration
-        // of getRealTimeData, then we increase the chance of missing that event. 200ms seems to work well..
-        msleep(200);
+        msleep(100);
         }
     }
 
