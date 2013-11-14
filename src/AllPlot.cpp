@@ -805,7 +805,9 @@ AllPlot::recalc()
     }
 
     setYMax();
+    refreshReferenceLines();
     refreshIntervalMarkers();
+    refreshCalibrationMarkers();
     refreshZoneLabels();
 
     //replot();
@@ -843,6 +845,100 @@ AllPlot::refreshIntervalMarkers()
         }
     }
 }
+
+void
+AllPlot::refreshCalibrationMarkers()
+{
+    foreach(QwtPlotMarker *mrk, cal_mrk) {
+        mrk->detach();
+        delete mrk;
+    }
+    cal_mrk.clear();
+
+    if (rideItem->ride()) {
+        foreach(const RideFileCalibration &calibration, rideItem->ride()->calibrations()) {
+            QwtPlotMarker *mrk = new QwtPlotMarker;
+            cal_mrk.append(mrk);
+            mrk->attach(this);
+            mrk->setLineStyle(QwtPlotMarker::VLine);
+            mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
+            mrk->setLinePen(QPen(GColor(CCALIBRATIONMARKER), 0, Qt::DashDotLine));
+            QwtText text("\n\n"+calibration.name);
+            text.setFont(QFont("Helvetica", 9, QFont::Bold));
+            text.setColor(GColor(CCALIBRATIONMARKER));
+            if (!bydist)
+                mrk->setValue(calibration.start / 60.0, 0.0);
+            else
+                mrk->setValue((mainWindow->useMetricUnits ? 1 : MILES_PER_KM) *
+                                rideItem->ride()->timeToDistance(calibration.start), 0.0);
+            mrk->setLabel(text);
+        }
+    }
+}
+
+void
+AllPlot::refreshReferenceLines()
+{
+    foreach(QwtPlotCurve *referenceLine, referenceLines) {
+        referenceLine->detach();
+        delete referenceLine;
+    }
+    referenceLines.clear();
+    if (rideItem->ride()) {
+        foreach(const RideFilePoint *referencePoint, rideItem->ride()->referencePoints()) {
+            QwtPlotCurve *referenceLine;
+
+            QVector<double> xaxis;
+            QVector<double> yaxis;
+            if (bydist) {
+                xaxis.append(referencePlot == NULL ? smoothDistance.first() : referencePlot->smoothDistance.first());
+                xaxis.append(referencePlot == NULL ? smoothDistance.last() : referencePlot->smoothDistance.last());
+
+            } else {
+                xaxis.append(referencePlot == NULL ? smoothTime.first() : referencePlot->smoothTime.first());
+                xaxis.append(referencePlot == NULL ? smoothTime.last() : referencePlot->smoothTime.last());
+            }
+
+            if (referencePoint->watts != 0)  {
+                referenceLine = new QwtPlotCurve(tr("Power Ref"));
+                referenceLine->setYAxis(yLeft);
+                QPen wattsPen = QPen(GColor(CPOWER));
+                wattsPen.setWidth(1);
+                wattsPen.setStyle(Qt::DashLine);
+                referenceLine->setPen(wattsPen);
+
+                yaxis.append(referencePoint->watts);
+                yaxis.append(referencePoint->watts);
+            } else if (referencePoint->hr != 0)  {
+                referenceLine = new QwtPlotCurve(tr("Heart Rate Ref"));
+                referenceLine->setYAxis(yLeft);
+                QPen hrPen = QPen(GColor(CHEARTRATE));
+                hrPen.setWidth(1);
+                hrPen.setStyle(Qt::DashLine);
+                referenceLine->setPen(hrPen);
+
+                yaxis.append(referencePoint->hr);
+                yaxis.append(referencePoint->hr);
+            } else if (referencePoint->cad != 0)  {
+                referenceLine = new QwtPlotCurve(tr("Cadence Ref"));
+                referenceLine->setYAxis(yLeft);
+                QPen cadPen = QPen(GColor(CCADENCE));
+                cadPen.setWidth(1);
+                cadPen.setStyle(Qt::DashLine);
+                referenceLine->setPen(cadPen);
+
+                yaxis.append(referencePoint->cad);
+                yaxis.append(referencePoint->cad);
+            }
+
+            referenceLine->setData(xaxis,yaxis);
+            referenceLine->attach(this);
+            referenceLine->setVisible(true);
+            referenceLines.append(referenceLine);
+        }
+    }
+}
+
 
 void
 AllPlot::setYMax()
@@ -1180,7 +1276,9 @@ AllPlot::setDataFromPlot(AllPlot *plot, int startidx, int stopidx)
     }
 
 
+    refreshReferenceLines();
     refreshIntervalMarkers();
+    refreshCalibrationMarkers();
     refreshZoneLabels();
 
     //if (this->legend()) this->legend()->show();
@@ -1322,6 +1420,16 @@ AllPlot::setDataFromRide(RideItem *_rideItem)
         foreach(QwtPlotMarker *mrk, d_mrk)
             delete mrk;
         d_mrk.clear();
+
+        foreach(QwtPlotMarker *mrk, cal_mrk)
+            delete mrk;
+        cal_mrk.clear();
+
+        foreach(QwtPlotCurve *referenceLine, referenceLines) {
+            referenceLine->detach();
+            delete referenceLine;
+        }
+        referenceLines.clear();
     }
 }
 

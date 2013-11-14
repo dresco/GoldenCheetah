@@ -395,6 +395,10 @@ void RideFile::appendPoint(double secs, double cad, double hr, double km,
     if (!isfinite(watts) || watts<0) watts=0;
     if (!isfinite(interval) || interval<0) interval=0;
 
+    // truncate alt out of bounds -- ? should do for all, but uncomfortable about
+    //                                 setting an absolute max. At least We know the highest
+    //                                 point on Earth (Mt Everest).
+    if (alt > RideFile::maximumFor(RideFile::alt)) alt = RideFile::maximumFor(RideFile::alt);
     dataPoints_.append(new RideFilePoint(secs, cad, hr, km, kph,
                                          nm, watts, alt, lon, lat, headwind, slope, temp, lrbalance, interval));
     dataPresent.secs     |= (secs != 0);
@@ -697,4 +701,10 @@ RideFile::getWeight()
     if (weight_ <= 0.00) weight_ = 75.00;
 
     return weight_;
+}
+
+void RideFile::appendReference(const RideFilePoint &point)
+{
+    referencePoints_.append(new RideFilePoint(point.secs,point.cad,point.hr,point.km,point.kph,point.nm,point.watts,point.alt,point.lon,point.lat,
+                                         point.headwind, point.slope, point.temp, point.lrbalance, point.interval));
 }

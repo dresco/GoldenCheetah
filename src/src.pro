@@ -22,8 +22,8 @@ LIBS += -lm $${LIBZ_LIBS}
     INCLUDEPATH += $${LIBOAUTH_INCLUDE}
     LIBS        += $${LIBOAUTH_LIBS}
     DEFINES     += GC_HAVE_LIBOAUTH
-    SOURCES     += TwitterDialog.cpp
-    HEADERS     += TwitterDialog.h
+    SOURCES     += OAuthDialog.cpp TwitterDialog.cpp ShareDialog.cpp
+    HEADERS     += OAuthDialog.h TwitterDialog.h ShareDialog.h
 }
 
 !isEmpty( D2XX_INCLUDE ) {
@@ -353,7 +353,6 @@ HEADERS += \
         RideNavigator.h \
         RideNavigatorProxy.h \
         RideWindow.h \
-        RideWithGPSDialog.h \
         SaveDialogs.h \
         SmallPlot.h \
         RideSummaryWindow.h \
@@ -375,10 +374,6 @@ HEADERS += \
         SmfRideFile.h \
         SrdRideFile.h \
         SrmRideFile.h \
-        StravaDownloadDialog.h \
-        StravaParser.h \
-        StravaRideFile.h \
-        StravaUploadDialog.h \
         StressCalculator.h \
         SummaryMetrics.h \
         SummaryWindow.h \
@@ -548,7 +543,6 @@ SOURCES += \
         RideNavigator.cpp \
         RideSummaryWindow.cpp \
         RideWindow.cpp \
-        RideWithGPSDialog.cpp \
         SaveDialogs.cpp \
         ScatterPlot.cpp \
         ScatterWindow.cpp \
@@ -569,10 +563,6 @@ SOURCES += \
         SmfRideFile.cpp \
         SrdRideFile.cpp \
         SrmRideFile.cpp \
-        StravaDownloadDialog.cpp \
-        StravaParser.cpp \
-        StravaRideFile.cpp \
-        StravaUploadDialog.cpp \
         StressCalculator.cpp \
         SummaryMetrics.cpp \
         SummaryWindow.cpp \

@@ -61,6 +61,8 @@ class AllPlot : public QwtPlot
         bool shadeZones() const;
         void refreshZoneLabels();
         void refreshIntervalMarkers();
+        void refreshCalibrationMarkers();
+        void refreshReferenceLines();
         void setAxisTitle(int axis, QString label);
 
         // refresh data / plot parameters
@@ -117,6 +119,7 @@ class AllPlot : public QwtPlot
         // plot objects
         QwtPlotGrid *grid;
         QVector<QwtPlotMarker*> d_mrk;
+        QVector<QwtPlotMarker*> cal_mrk;
         QwtPlotMarker *allMarker1;
         QwtPlotMarker *allMarker2;
         QwtPlotCurve *wattsCurve;
@@ -131,6 +134,7 @@ class AllPlot : public QwtPlot
         QwtPlotCurve *balanceRCurve;
         QwtPlotCurve *intervalHighlighterCurve;  // highlight selected intervals on the Plot
         QList <AllPlotZoneLabel *> zoneLabels;
+        QVector<QwtPlotCurve*> referenceLines;
 
         // source data
         QVector<double> hrArray;
