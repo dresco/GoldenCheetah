@@ -231,6 +231,7 @@ struct FitFileReaderState
                 case 1124: rideFile->setDeviceType("Garmin FR110"); break;
                 case 1169: rideFile->setDeviceType("Garmin Edge 800"); break;
                 case 1325: rideFile->setDeviceType("Garmin Edge 200"); break;
+                case 1328: rideFile->setDeviceType("Garmin FR910XT"); break;
                 case 1561: rideFile->setDeviceType("Garmin Edge 510"); break;
                 case 1567: rideFile->setDeviceType("Garmin Edge 810"); break;
                 case 20119: rideFile->setDeviceType("Garmin Training Center"); break;
@@ -248,6 +249,30 @@ struct FitFileReaderState
             rideFile->setDeviceType(QString("Unknown FIT Device %1:%2").arg(manu).arg(prod));
         }
         rideFile->setFileFormat("FIT (*.fit)");
+    }
+
+    void decodeSession(const FitDefinition &def, int, const std::vector<fit_value_t> values) {
+        int i = 0;
+        foreach(const FitField &field, def.fields) {
+            fit_value_t value = values[i++];
+
+            if( value == NA_VALUE )
+                continue;
+
+            printf("decodeSession  field %d: %d bytes, num %d, type %d\n", i, field.size, field.num, field.type );
+        }
+    }
+
+    void decodeDeviceInfo(const FitDefinition &def, int, const std::vector<fit_value_t> values) {
+        int i = 0;
+        foreach(const FitField &field, def.fields) {
+            fit_value_t value = values[i++];
+
+            if( value == NA_VALUE )
+                continue;
+
+            printf("decodeDeviceInfo  field %d: %d bytes, num %d, type %d\n", i, field.size, field.num, field.type );
+        }
     }
 
     void decodeEvent(const FitDefinition &def, int, const std::vector<fit_value_t> values) {
@@ -360,6 +385,7 @@ struct FitFileReaderState
             time = last_time + time_offset;
         double alt = 0, cad = 0, km = 0, hr = 0, lat = 0, lng = 0, badgps = 0, lrbalance = 0;
         double kph = 0, temperature = RideFile::noTemp, watts = 0, slope = 0;
+        double leftTorqueEff = 0, rightTorqueEff = 0, leftPedalSmooth = 0, rightPedalSmooth = 0;
         fit_value_t lati = NA_VALUE, lngi = NA_VALUE;
         int i = 0;
         foreach(const FitField &field, def.fields) {
@@ -369,35 +395,76 @@ struct FitFileReaderState
                 continue;
 
             switch (field.num) {
-                case 253: time = value + qbase_time.toTime_t();
+                case 253: // TIMESTAMP
+                          time = value + qbase_time.toTime_t();
                           // Time MUST NOT go backwards
                           // You canny break the laws of physics, Jim
                           if (time < last_time)
                               time = last_time;
                           break;
-                case 0: lati = value; break;
-                case 1: lngi = value; break;
-                case 2: alt = value / 5.0 - 500.0; break;
-                case 3: hr = value; break;
-                case 4: cad = value; break;
-                case 5: km = value / 100000.0; break;
-                case 6: kph = value * 3.6 / 1000.0; break;
-                case 7: watts = value; break;
+                case 0: // POSITION_LAT
+                        lati = value;
+                        break;
+                case 1: // POSITION_LONG
+                        lngi = value;
+                        break;
+                case 2: // ALTITUDE
+                        alt = value / 5.0 - 500.0;
+                        break;
+                case 3: // HEART_RATE
+                        hr = value;
+                        break;
+                case 4: // CADENCE
+                        cad = value;
+                        break;
+                case 5: // DISTANCE
+                        km = value / 100000.0;
+                        break;
+                case 6: // SPEED
+                        kph = value * 3.6 / 1000.0;
+                        break;
+                case 7: // POWER
+                        watts = value;
+                        break;
                 case 8: break; // packed speed/dist
-                case 9: slope = value / 100.0;
+                case 9: // GRADE
+                        slope = value / 100.0;
                         break;
                 case 10: //resistance = value;
-                        break;
+                         break;
                 case 11: //time_from_course = value / 1000.0;
                          break;
                 case 12: break; // "cycle_length"
-                case 13: temperature = value; break;
+                case 13: // TEMPERATURE
+                         temperature = value;
+                         break;
                 case 29: // ACCUMULATED_POWER
                          break;
-                case 30: lrbalance = (value & 0x80 ? 100 - (value & 0x7F) : value & 0x7F);
+                case 30: //LEFT_RIGHT_BALANCE
+                         lrbalance = (value & 0x80 ? 100 - (value & 0x7F) : value & 0x7F);
                          break;
                 case 31: // GPS Accuracy
                          break;
+                case 43: // LEFT_TORQUE_EFFECTIVENESS
+                         leftTorqueEff = value / 2.0;
+                         //qDebug() << "LEFT_TORQUE_EFFECTIVENESS" << leftTorqueEff;
+                         break;
+                case 44: // RIGHT_TORQUE_EFFECTIVENESS
+                         rightTorqueEff = value / 2.0;
+                         //qDebug() << "RIGHT_TORQUE_EFFECTIVENESS" << rightTorqueEff;
+                         break;
+                case 45: // LEFT_PEDAL_SMOOTHNESS
+                         leftPedalSmooth = value / 2.0;
+                         //qDebug() << "LEFT_PEDAL_SMOOTHNESS" << leftPedalSmooth;
+                         break;
+                case 46: // RIGHT_PEDAL_SMOOTHNESS
+                         rightPedalSmooth = value / 2.0;
+                         //qDebug() << "RIGHT_PEDAL_SMOOTHNESS" << rightPedalSmooth;
+                         break;
+                case 47: // COMBINED_PEDAL_SMOOTHNES
+                         //qDebug() << "COMBINED_PEDAL_SMOOTHNES" << value;
+                         break;
+
                 default: unknown_record_fields.insert(field.num);
             }
         }
@@ -556,23 +623,28 @@ struct FitFileReaderState
             std::vector<fit_value_t> values;
             foreach(const FitField &field, def.fields) {
                 fit_value_t v;
+                int size;
                 switch (field.type) {
-                    case 0: v = read_uint8(&count); break;
-                    case 1: v = read_int8(&count); break;
-                    case 2: v = read_uint8(&count); break;
-                    case 3: v = read_int16(def.is_big_endian, &count); break;
-                    case 4: v = read_uint16(def.is_big_endian, &count); break;
-                    case 5: v = read_int32(def.is_big_endian, &count); break;
-                    case 6: v = read_uint32(def.is_big_endian, &count); break;
-                    case 10: v = read_uint8z(&count); break;
-                    case 11: v = read_uint16z(def.is_big_endian, &count); break;
-                    case 12: v = read_uint32z(def.is_big_endian, &count); break;
+                    case 0: v = read_uint8(&count); size = 1; break;
+                    case 1: v = read_int8(&count); size = 1;  break;
+                    case 2: v = read_uint8(&count); size = 1;  break;
+                    case 3: v = read_int16(def.is_big_endian, &count); size = 2;  break;
+                    case 4: v = read_uint16(def.is_big_endian, &count); size = 2;  break;
+                    case 5: v = read_int32(def.is_big_endian, &count); size = 4;  break;
+                    case 6: v = read_uint32(def.is_big_endian, &count); size = 4;  break;
+                    case 10: v = read_uint8z(&count); size = 1; break;
+                    case 11: v = read_uint16z(def.is_big_endian, &count); size = 2; break;
+                    case 12: v = read_uint32z(def.is_big_endian, &count); size = 4; break;
                     // we may need to add support for float, string + byte base types here
                     default:
                         read_unknown( field.size, &count );
                         v = NA_VALUE;
                         unknown_base_type.insert(field.num);
                 }
+                // Quick fix : we need to support multivalues
+                if (size < field.size)
+                    read_unknown( field.size-size, &count );
+
                 values.push_back(v);
                 //printf( " field: type=%d num=%d value=%lld\n",
                 //    field.type, field.num, v );
@@ -587,8 +659,8 @@ struct FitFileReaderState
                 case 19: decodeLap(def, time_offset, values); break;
                 case RECORD_TYPE: decodeRecord(def, time_offset, values); break;
                 case 21: decodeEvent(def, time_offset, values); break;
-                case 23: /* device info */
-                case 18: /* session */
+                case 23: //decodeDeviceInfo(def, time_offset, values); break; /* device info */
+                case 18: //decodeSession(def, time_offset, values); break; /* session */
                 case 22: /* undocumented */
                 case 72: /* undocumented  - new for garmin 800*/
                 case 34: /* activity */
@@ -647,15 +719,17 @@ struct FitFileReaderState
 
         int bytes_read = 0;
         bool stop = false;
+        bool truncated = false;
         try {
             while (!stop && (bytes_read < data_size))
                 bytes_read += read_record(stop, errors);
         }
         catch (TruncatedRead &e) {
             errors << "truncated file body";
-            file.close();
-            delete rideFile;
-            return NULL;
+            //file.close();
+            //delete rideFile;
+            //return NULL;
+            truncated = true;
         }
         if (stop) {
             file.close();
@@ -663,8 +737,11 @@ struct FitFileReaderState
             return NULL;
         }
         else {
-            int crc = read_uint16( false ); // always littleEndian
-            (void) crc;
+            if (!truncated) {
+                int crc = read_uint16( false ); // always littleEndian
+                (void) crc;
+            }
+
             foreach(int num, unknown_global_msg_nums)
                 qDebug() << QString("FitRideFile: unknown global message number %1; ignoring it").arg(num);
             foreach(int num, unknown_record_fields)
