@@ -28,6 +28,7 @@
 #include <QPixmap>
 #include <QEvent>
 #include <QMouseEvent>
+#include <QFileDialog>
 #include <QGraphicsDropShadowEffect>
 
 Q_DECLARE_METATYPE(QWidget*)
@@ -761,6 +762,19 @@ GcChartWindow:: setBlankLayout(QLayout *layout)
 }
 
 void
+GcChartWindow::setControls(QWidget *x)
+{
+    GcWindow::setControls(x);
+
+    if (x != NULL) {
+        menu->clear();
+        menu->addAction(tr("All Chart Settings"), this, SIGNAL(showControls()));
+        menu->addAction(tr("Export as PNG"), this, SLOT(saveImage()));
+        menu->addAction(tr("Close"), this, SLOT(_closeWindow()));
+    }
+}
+
+void
 GcChartWindow:: setIsBlank(bool value)
 {
     _layout->setCurrentWidget(value?_blank:_mainWidget);
@@ -784,4 +798,19 @@ void GcChartWindow:: unreveal()
 void GcChartWindow:: hideRevealControls()
 {
     _revealControls->hide();
+}
+
+void GcChartWindow:: saveImage()
+{
+    QString fileName = title()+".png";
+    fileName = QFileDialog::getSaveFileName(this,"Save PNG ",  QString(), title()+".png (*.png)");
+
+   if ( !fileName.isEmpty() )
+   {
+       QPixmap picture;
+       menuButton->hide();
+       picture = QPixmap::grabWidget (this);
+
+       picture.save(fileName);
+   }
 }
