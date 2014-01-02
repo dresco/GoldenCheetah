@@ -109,6 +109,9 @@ MainWindow::MainWindow(const QDir &home)
      *--------------------------------------------------------------------*/
     setAttribute(Qt::WA_DeleteOnClose);
     mainwindows.append(this);  // add us to the list of open windows
+#ifdef Q_OS_MAC
+    head = NULL; // early resize event causes a crash
+#endif
 
     // bootstrap
     Context *context = new Context(this);
@@ -228,6 +231,17 @@ MainWindow::MainWindow(const QDir &home)
      *  Mac Toolbar
      *--------------------------------------------------------------------*/
 #ifdef Q_OS_MAC 
+#if QT_VERSION > 0x50000
+    head = addToolBar(context->athlete->cyclist);
+    head->setContentsMargins(20,0,20,0);
+    head->setFloatable(false);
+    head->setMovable(false);
+
+    // widgets
+    QWidget *macAnalButtons = new QWidget(this);
+    macAnalButtons->setContentsMargins(20,5,20,0);
+
+#else
     setUnifiedTitleAndToolBarOnMac(true);
     head = addToolBar(context->athlete->cyclist);
     head->setContentsMargins(0,0,0,0);
@@ -235,6 +249,8 @@ MainWindow::MainWindow(const QDir &home)
     // widgets
     QWidget *macAnalButtons = new QWidget(this);
     macAnalButtons->setContentsMargins(0,0,20,0);
+
+#endif
 
     // lhs buttons
     QHBoxLayout *lb = new QHBoxLayout(macAnalButtons);
@@ -324,7 +340,11 @@ MainWindow::MainWindow(const QDir &home)
 
 #ifdef GC_HAVE_LUCENE
     searchBox = new SearchFilterBox(this,context,false);
+#if QT_VERSION > 0x50000
     QStyle *toolStyle = QStyleFactory::create("fusion");
+#else
+    QStyle *toolStyle = QStyleFactory::create("Cleanlooks");
+#endif
     searchBox->setStyle(toolStyle);
     searchBox->setFixedWidth(200);
     head->addWidget(searchBox);
@@ -341,7 +361,11 @@ MainWindow::MainWindow(const QDir &home)
 
     head = new GcToolBar(this);
 
+#if QT_VERSION > 0x50000
     QStyle *toolStyle = QStyleFactory::create("fusion");
+#else
+    QStyle *toolStyle = QStyleFactory::create("Cleanlooks");
+#endif
     QPalette metal;
     metal.setColor(QPalette::Button, QColor(215,215,215));
 
@@ -454,10 +478,11 @@ MainWindow::MainWindow(const QDir &home)
      * Central Widget
      *--------------------------------------------------------------------*/
 
-    tabbar = new QTabBar(this);
+    tabbar = new DragBar(this);
     tabbar->setAutoFillBackground(true);
     tabbar->setShape(QTabBar::RoundedSouth);
     tabbar->setDrawBase(false);
+    tabbar->setTabsClosable(true);
     QPalette tabbarPalette;
     tabbarPalette.setBrush(backgroundRole(), QColor("#B3B4B6"));
     tabbar->setPalette(tabbarPalette);
@@ -474,7 +499,9 @@ MainWindow::MainWindow(const QDir &home)
     tabStack->addWidget(currentTab);
     tabStack->setCurrentIndex(0);
 
+    connect(tabbar, SIGNAL(dragTab(int)), this, SLOT(switchTab(int)));
     connect(tabbar, SIGNAL(currentChanged(int)), this, SLOT(switchTab(int)));
+    connect(tabbar, SIGNAL(tabCloseRequested(int)), this, SLOT(closeTabClicked(int)));
 
     /*----------------------------------------------------------------------
      * Central Widget
@@ -834,10 +861,12 @@ MainWindow::toggleFullScreen()
 void
 MainWindow::resizeEvent(QResizeEvent*)
 {
-    appsettings->setValue(GC_SETTINGS_MAIN_GEOM, geometry());
 #ifdef Q_OS_MAC
-    head->updateGeometry();
-    repaint();
+    if (head) {
+        appsettings->setValue(GC_SETTINGS_MAIN_GEOM, geometry());
+        head->updateGeometry();
+        repaint();
+    }
 #endif
 }
 
@@ -1061,8 +1090,10 @@ MainWindow::dragEnterEvent(QDragEnterEvent *event)
         if (url.toString().startsWith("http"))
             accept = false;
 
-    if (accept) event->acceptProposedAction(); // whatever you wanna drop we will try and process!
-    else event->ignore();
+    if (accept) {
+        event->acceptProposedAction(); // whatever you wanna drop we will try and process!
+        raise();
+    } else event->ignore();
 }
 
 void
@@ -1305,9 +1336,6 @@ MainWindow::openTab(QString name)
 
     setUpdatesEnabled(false);
 
-    // show the tabbar if we're gonna open tabs!
-    showTabbar(true);
-
     // bootstrap
     Context *context = new Context(this);
     context->athlete = new Athlete(context, home);
@@ -1334,7 +1362,21 @@ MainWindow::openTab(QString name)
     saveState(currentTab->context);
     restoreState(currentTab->context);
 
+    // show the tabbar if we're gonna open tabs -- but wait till the last second
+    // to show it to avoid crappy paint artefacts
+    showTabbar(true);
+
     setUpdatesEnabled(true);
+}
+
+void
+MainWindow::closeTabClicked(int index)
+{
+    Tab *tab = tabList[index];
+    if (saveRideExitDialog(tab->context) == false) return;
+
+    // lets wipe it
+    removeTab(tab);
 }
 
 bool
@@ -1520,6 +1562,18 @@ MainWindow::switchTab(int index)
 {
     if (index < 0) return;
 
+    setUpdatesEnabled(false);
+
+#ifdef Q_OS_MAC // close buttons on the left on Mac
+    // Only have close button on current tab (prettier)
+    for(int i=0; i<tabbar->count(); i++) tabbar->tabButton(i, QTabBar::LeftSide)->hide();
+    tabbar->tabButton(index, QTabBar::LeftSide)->show();
+#else
+    // Only have close button on current tab (prettier)
+    for(int i=0; i<tabbar->count(); i++) tabbar->tabButton(i, QTabBar::RightSide)->hide();
+    tabbar->tabButton(index, QTabBar::RightSide)->show();
+#endif
+
     // save how we are
     saveState(currentTab->context);
 
@@ -1531,6 +1585,7 @@ MainWindow::switchTab(int index)
 
     setWindowTitle(currentTab->context->athlete->home.dirName());
 
+    setUpdatesEnabled(true);
 }
 
 

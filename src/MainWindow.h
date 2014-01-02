@@ -28,6 +28,7 @@
 #include <QStackedWidget>
 #include "RideItem.h"
 #include "TimeUtils.h"
+#include "DragBar.h"
 
 #ifdef Q_OS_MAC
 // What versions are supported by this SDK?
@@ -101,6 +102,7 @@ class MainWindow : public QMainWindow
         void setOpenTabMenu(); // set the Open Tab menu
         void newCyclistTab();  // create a new Cyclist
         void openTab(QString name);
+        void closeTabClicked(int index); // user clicked to close tab
         bool closeTab();       // close current, might not if the user 
                                // changes mind if there are unsaved changes.
         void removeTab(Tab*);  // remove without question
@@ -215,8 +217,8 @@ class MainWindow : public QMainWindow
         QIcon importIcon, composeIcon, intervalIcon, splitIcon,
               deleteIcon, sidebarIcon, lowbarIcon, tabbedIcon, tiledIcon;
 #endif
-        // tab bar
-        QTabBar *tabbar;
+        // tab bar (that supports swtitching on drag and drop)
+        DragBar *tabbar;
         QStackedWidget *tabStack;
 
         // window and tab menu

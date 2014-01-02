@@ -279,6 +279,8 @@ HEADERS += \
         Colors.h \
         ColorButton.h \
         CommPort.h \
+        CompareDateRange.h \
+        CompareInterval.h \
         ComparePane.h \
         Computrainer.h \
         Computrainer3dpFile.h \
@@ -295,6 +297,7 @@ HEADERS += \
         DeviceConfiguration.h \
         DialWindow.h \
         DiarySidebar.h \
+        DragBar.h \
         DownloadRideDialog.h \
         ErgFile.h \
         ErgDB.h \
@@ -470,6 +473,8 @@ SOURCES += \
         Colors.cpp \
         ColorButton.cpp \
         CommPort.cpp \
+        CompareDateRange.cpp \
+        CompareInterval.cpp \
         ComparePane.cpp \
         Computrainer.cpp \
         Computrainer3dpFile.cpp \
@@ -487,6 +492,7 @@ SOURCES += \
         DialWindow.cpp \
         DiarySidebar.cpp \
         DownloadRideDialog.cpp \
+        DragBar.cpp \
         ErgDB.cpp \
         ErgDBDownloadDialog.cpp \
         ErgFile.cpp \
