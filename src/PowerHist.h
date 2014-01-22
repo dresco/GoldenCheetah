@@ -87,6 +87,22 @@ class penTooltip: public QwtPlotZoomer
         QString tip;
 };
 
+class HistData // each curve needs a lot of data (!? this may need refactoring, it seems all over the place)
+{
+    public:
+
+        // storage for data counts
+        QVector<unsigned int> aPowerArray, wattsArray, wattsZoneArray, wattsKgArray, nmArray, hrArray,
+                              hrZoneArray, kphArray, cadArray, metricArray;
+
+        // storage for data counts in interval selected
+        QVector<unsigned int> aPowerSelectedArray, wattsSelectedArray, wattsZoneSelectedArray,
+                              wattsKgSelectedArray,
+                              nmSelectedArray, hrSelectedArray,
+                              hrZoneSelectedArray, kphSelectedArray,
+                              cadSelectedArray;
+};
+
 class PowerHist : public QwtPlot
 {
     Q_OBJECT
@@ -100,11 +116,12 @@ class PowerHist : public QwtPlot
 
     public:
 
-        PowerHist(Context *context);
+        PowerHist(Context *context, bool rangemode);
         ~PowerHist();
 
         double minX;
         double maxX;
+        bool rangemode;
 
     public slots:
 
@@ -115,12 +132,16 @@ class PowerHist : public QwtPlot
         // set data from a ride
         void setData(RideItem *_rideItem, bool force=false);
 
+        // set data from the compare intervals -or- dateranges
+        void setDataFromCompare(); // cache
+        void setDataFromCompare(QString totalMetric, QString distMetric); // metric
+
         // set data from a ridefile cache
         void setData(RideFileCache *source);
 
         // set data from metrics
         void setData(QList<SummaryMetrics>&results, QString totalMetric, QString distMetric,
-                     bool isFiltered, QStringList files);
+                     bool isFiltered, QStringList files, HistData *data);
 
         void setlnY(bool value);
         void setWithZeros(bool value);
@@ -143,11 +164,16 @@ class PowerHist : public QwtPlot
         void pointHover(QwtPlotCurve *curve, int index);
 
         // get told to refresh
-        void recalc(bool force=false);
+        void recalc(bool force=false); // normal mode recalc
+        void recalcCompare(); // compare mode recalc
         void refreshZoneLabels();
 
         // redraw, reset zoom base
         void updatePlot();
+
+        // hide / show curves etc
+        void hideStandard(bool);
+        void setComparePens();
 
     protected:
 
@@ -171,6 +197,8 @@ class PowerHist : public QwtPlot
         double dt;         // length of sample
         bool absolutetime; // do we sum absolute or percentage?
 
+        HistData standard;
+
     private:
 
         // plot objects
@@ -179,9 +207,17 @@ class PowerHist : public QwtPlot
         HrHistBackground *hrbg;
         penTooltip *zoomer;
         LTMCanvasPicker *canvasPicker;
+
+        // curves when NOT in compare mode
         QwtPlotCurve *curve, *curveSelected;
+
+        // curves when ARE in compare mode
+        QList<QwtPlotCurve*> compareCurves;
+
+        // background shading
         QList <PowerHistZoneLabel *> zoneLabels;
         QList <HrHistZoneLabel *> hrzoneLabels;
+
         QString metricX, metricY;
         int digits;
         double delta;
@@ -189,16 +225,9 @@ class PowerHist : public QwtPlot
         // source cache
         RideFileCache *cache;
 
-        // storage for data counts
-        QVector<unsigned int> aPowerArray, wattsArray, wattsZoneArray, wattsKgArray, nmArray, hrArray,
-                              hrZoneArray, kphArray, cadArray, metricArray;
+        // data arrays -- for one curve, not in compare mode
+        QList<HistData> compareData;
 
-        // storage for data counts in interval selected
-        QVector<unsigned int> aPowerSelectedArray, wattsSelectedArray, wattsZoneSelectedArray,
-                              wattsKgSelectedArray,
-                              nmSelectedArray, hrSelectedArray,
-                              hrZoneSelectedArray, kphSelectedArray,
-                              cadSelectedArray;
 
         enum Source { Ride, Cache, Metric } source, LASTsource;
         QColor metricColor;
