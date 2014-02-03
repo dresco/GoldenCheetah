@@ -18,6 +18,7 @@
 
 
 #include "ErgFilePlot.h"
+#include "WPrime.h"
 #include "Context.h"
 
 // Bridge between QwtPlot and ErgFile to avoid having to
@@ -89,6 +90,8 @@ ErgFilePlot::ErgFilePlot(Context *context) : context(context)
     setCanvasBackground(GColor(CRIDEPLOTBACKGROUND));
     static_cast<QwtPlotCanvas*>(canvas())->setFrameStyle(QFrame::NoFrame);
     //courseData = data;                      // what we plot
+    setAutoDelete(false);
+    setAxesCount(QwtAxis::yRight, 4);
 
     // Setup the left axis (Power)
     setAxisTitle(yLeft, "Watts");
@@ -131,6 +134,9 @@ ErgFilePlot::ErgFilePlot(Context *context) : context(context)
     pal.setColor(QPalette::Text, GColor(CRIDEPLOTXAXIS));
     axisWidget(QwtPlot::xBottom)->setPalette(pal);
 
+    // axis 1 not currently used
+    setAxisVisible(QwtAxisId(QwtAxis::yRight,1), false); // max speed of 60mph/60kmh seems ok to me!
+    enableAxis(QwtAxisId(QwtAxis::yRight,1).id, false);
 
     // set all the orher axes off but scaled
     setAxisScale(yLeft, 0, 300); // max cadence and hr
@@ -139,7 +145,8 @@ ErgFilePlot::ErgFilePlot(Context *context) : context(context)
 
     setAxisScale(yRight, 0, 250); // max cadence and hr
     enableAxis(yRight, false);
-    setAxisScale(QwtAxisId(QwtAxis::yRight,2).id, 0, 60); // max speed of 60mph/60kmh seems ok to me!
+    setAxisScale(QwtAxisId(QwtAxis::yRight,2), 0, 60); // max speed of 60mph/60kmh seems ok to me!
+    setAxisVisible(QwtAxisId(QwtAxis::yRight,2), false); // max speed of 60mph/60kmh seems ok to me!
     enableAxis(QwtAxisId(QwtAxis::yRight,2).id, false);
 
     // data bridge to ergfile
@@ -157,6 +164,35 @@ ErgFilePlot::ErgFilePlot(Context *context) : context(context)
     LodCurve->setBrush(brush_color);   // fill below the line
     QPen Lodpen = QPen(Qt::blue, 1.0);
     LodCurve->setPen(Lodpen);
+
+    wbalCurvePredict = new QwtPlotCurve("W'bal Predict");
+    wbalCurvePredict->attach(this);
+    wbalCurvePredict->setYAxis(QwtAxisId(QwtAxis::yRight, 3));
+    QColor predict = GColor(CWBAL).darker();
+    predict.setAlpha(200);
+    QPen wbalPen = QPen(predict, 2.0); // predict darker...
+    wbalCurvePredict->setPen(wbalPen);
+    wbalCurvePredict->setVisible(true);
+
+    wbalCurveActual = new QwtPlotCurve("W'bal Actual");
+    wbalCurveActual->attach(this);
+    wbalCurveActual->setYAxis(QwtAxisId(QwtAxis::yRight, 3));
+    QPen wbalPenA = QPen(GColor(CWBAL), 1.0); // actual lighter
+    wbalCurveActual->setPen(wbalPenA);
+
+    sd = new QwtScaleDraw;
+    sd->enableComponent(QwtScaleDraw::Ticks, false);
+    sd->enableComponent(QwtScaleDraw::Backbone, false);
+    sd->setLabelRotation(90);// in the 000s
+    sd->setTickLength(QwtScaleDiv::MajorTick, 3);
+    setAxisScaleDraw(QwtAxisId(QwtAxis::yRight, 3), sd);
+    pal.setColor(QPalette::WindowText, GColor(CWBAL));
+    pal.setColor(QPalette::Text, GColor(CWBAL));
+    axisWidget(QwtAxisId(QwtAxis::yRight, 3))->setPalette(pal);
+    QwtPlot::setAxisFont(QwtAxisId(QwtAxis::yRight, 3), stGiles);
+    QwtText title2("W'bal");
+    title2.setFont(stGiles);
+    QwtPlot::setAxisTitle(QwtAxisId(QwtAxis::yRight,3), title2);
 
     // telemetry history
     wattsCurve = new QwtPlotCurve("Power");
@@ -339,6 +375,20 @@ ErgFilePlot::setData(ErgFile *ergfile)
             }
         }
 
+        // wbal predict curve and clear actual curve
+        QVector<double> empty;
+        wbalCurveActual->setSamples(empty, empty);
+
+        // compute wbal curve for the erg file
+        calculator.setErg(ergfile);
+
+        setAxisTitle(QwtAxisId(QwtAxis::yRight, 3), tr("W' Balance (j)"));
+        setAxisScale(QwtAxisId(QwtAxis::yRight, 3),calculator.minY-1000,calculator.maxY+1000);
+        setAxisLabelAlignment(QwtAxisId(QwtAxis::yRight, 3),Qt::AlignVCenter);
+
+        // and the values ... but avoid sharing!
+        wbalCurvePredict->setSamples(calculator.xdata(), calculator.ydata());
+
     } else {
 
         // clear the plot we have nothing selected
@@ -359,6 +409,10 @@ ErgFilePlot::setData(ErgFile *ergfile)
             setAxisScaleDraw(QwtPlot::xBottom, (timedraw=new HourTimeScaleDraw()));
         setAxisScale(xBottom, (double)0, 1000 * 60 * 60, 15*60*1000);
     }
+
+    // make the xBottom scale visible
+    enableAxis(xBottom, true);
+    setAxisVisible(xBottom, true);
 }
 
 void

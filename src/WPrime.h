@@ -20,11 +20,13 @@
 #define _gc_wprime_include
 
 #include "RideFile.h"
+#include "ErgFile.h"
 #include "Context.h"
 #include "Athlete.h"
 #include "Zones.h"
 #include "RideMetric.h"
 #include <QVector>
+#include <QThread>
 #include <qwt_spline.h> // smoothing
 #include <math.h>
 
@@ -41,8 +43,10 @@ class WPrime {
         // construct and calculate series/metrics
         WPrime();
 
-        // recalc from ride selected
+        // recalc from ride selected or workout selected in train mode
         void setRide(RideFile *ride);
+        void setErg(ErgFile *erg);
+
         RideFile *ride() { return rideFile; }
 
         // W' 1second time series from 0
@@ -55,6 +59,7 @@ class WPrime {
         double maxMatch();
         double minY, maxY;
         double TAU, PCP_, CP, WPRIME, EXP;
+        double maxE() { return WPRIME ? (((WPRIME - minY) / WPRIME) * 100.00f) : 0; }
 
         double PCP();
 
@@ -75,4 +80,21 @@ class WPrime {
         int last;
 };
 
+class WPrimeIntegrator : public QThread
+{
+    public:
+        WPrimeIntegrator(QVector<int> &source, int begin, int end, double TAU);
+
+        // integrate from start to stop from source into output
+        // basically sums in the exponential decays, but we break it
+        // into threads to parallelise the work
+        void run();
+
+        QVector<int> &source;
+        int begin, end;
+        double TAU;
+
+        // resized to match source holds results
+        QVector<double> output;
+};
 #endif
