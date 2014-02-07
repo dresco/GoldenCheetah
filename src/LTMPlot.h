@@ -30,6 +30,7 @@
 
 #include "LTMTool.h"
 #include "LTMSettings.h"
+#include "LTMCanvasPicker.h"
 #include "MetricAggregator.h"
 
 #include "Context.h"
@@ -40,6 +41,7 @@ class LTMPlotZoneLabel;
 class LTMScaleDraw;
 class CompareScaleDraw;
 class StressCalculator;
+class LTMToolTip;
 
 class LTMPlot : public QwtPlot
 {
@@ -48,7 +50,7 @@ class LTMPlot : public QwtPlot
 
 
     public:
-        LTMPlot(LTMWindow *, Context *context);
+        LTMPlot(LTMWindow *, Context *context, bool first=true); // first if in a stack
         ~LTMPlot();
         void setData(LTMSettings *);
         void setCompareData(LTMSettings *);
@@ -71,6 +73,14 @@ class LTMPlot : public QwtPlot
         double minY[10], maxY[10], maxX;      // for all possible 10 curves
         void resetPMC();
         void createPMCCurveData(Context *,LTMSettings *, MetricDetail, QList<SummaryMetrics> &);
+
+        // just to make sure all plots have a common x axis in a stack
+        int getMaxX();
+        void setMaxX(int x);
+
+        // qwt picker
+        LTMToolTip *picker;
+        LTMCanvasPicker *_canvasPicker; // allow point selection/hover
 
     private:
         Context *context;
@@ -101,13 +111,15 @@ class LTMPlot : public QwtPlot
         void aggregateCurves(QVector<double> &a, QVector<double>&w); // aggregate a with w, updates a
         QwtAxisId chooseYAxis(QString);
         void refreshZoneLabels(QwtAxisId);
-        void refreshMarkers(QDate from, QDate to, int groupby);
+        void refreshMarkers(LTMSettings *, QDate from, QDate to, int groupby, QColor color);
 
         // remember the coggan or skiba stress calculators
         // so it isn't recalculated for each data series!
         StressCalculator *cogganPMC, *skibaPMC;
 
         QList<QwtAxisId> supportedAxes;
+        bool first;
+        int MAXX;
 };
 
 class CompareScaleDraw: public QwtScaleDraw

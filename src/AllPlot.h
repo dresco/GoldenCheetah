@@ -19,12 +19,14 @@
 #ifndef _GC_AllPlot_h
 #define _GC_AllPlot_h 1
 #include "GoldenCheetah.h"
+#include "Colors.h"
 
 #include <qwt_plot.h>
 #include <qwt_axis_id.h>
 #include <qwt_series_data.h>
 #include <qwt_plot_zoomer.h>
 #include <qwt_plot_curve.h>
+#include <qwt_plot_dict.h>
 #include <qwt_plot_marker.h>
 #include <qwt_point_3d.h>
 #include <qwt_compat.h>
@@ -51,6 +53,70 @@ class IntervalPlotData;
 class Context;
 class LTMToolTip;
 class LTMCanvasPicker;
+class QwtAxisId;
+
+class CurveColors
+{
+    public:
+        CurveColors(QwtPlot *plot) : plot(plot) {
+            saveState();
+        }
+
+        void restoreState() {
+
+            // make all the curves have the right pen
+            QHashIterator<QwtPlotCurve *, bool> c(state);
+            while (c.hasNext()) {
+                c.next();
+                c.key()->setVisible(c.value());
+            }
+        }
+
+        void saveState() {
+            state.clear();
+
+            // get a list of plots and colors
+            foreach(QwtPlotItem *item, plot->itemList(QwtPlotItem::Rtti_PlotCurve)) {
+                state.insert(static_cast<QwtPlotCurve*>(item), 
+                             static_cast<QwtPlotCurve*>(item)->isVisible());
+            }
+        }
+
+        void isolate(QwtPlotCurve *curve) {
+
+            // make the curve colored but all others go dull
+            QHashIterator<QwtPlotCurve *, bool> c(state);
+            while (c.hasNext()) {
+                c.next();
+                if (c.key() == curve) {
+                    c.key()->setVisible(c.value());
+                } else {
+
+                    // hide others
+                    c.key()->setVisible(false);
+                }
+            }
+        }
+
+        void isolateAxis(QwtAxisId id) {
+            QHashIterator<QwtPlotCurve *, bool> c(state);
+            while (c.hasNext()) {
+                c.next();
+
+                // isolate on axis hover
+                if (c.key()->yAxis() == id) {
+                    c.key()->setVisible(c.value());
+                } else {
+                    // hide others
+                    c.key()->setVisible(false);
+                }
+            }
+        }
+
+    private:
+        QwtPlot *plot;
+        QHash<QwtPlotCurve *, bool> state;
+};
 
 class AllPlot;
 class AllPlotObject : public QObject
@@ -189,6 +255,9 @@ class AllPlot : public QwtPlot
         void confirmTmpReference(double value, int axis, bool allowDelete);
         QwtPlotCurve* plotReferenceLine(const RideFilePoint *referencePoint);
 
+        // remembering state etc
+        CurveColors *curveColors;
+
     public slots:
 
         void setShowPower(int id);
@@ -266,6 +335,7 @@ class AllPlot : public QwtPlot
         AllPlot *referencePlot;
         AllPlotWindow *parent;
         bool wanttext, wantaxis;
+        bool isolation;
         LTMToolTip *tooltip;
         LTMCanvasPicker *_canvasPicker; // allow point selection/hover
 

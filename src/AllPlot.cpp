@@ -517,7 +517,8 @@ AllPlot::AllPlot(AllPlotWindow *parent, Context *context, RideFile::SeriesType s
     secondaryScope(secScope),
     context(context),
     parent(parent),
-    wanttext(wanttext)
+    wanttext(wanttext),
+    isolation(false)
 {
 
     if (appsettings->value(this, GC_SHADEZONES, true).toBool()==false)
@@ -529,6 +530,9 @@ AllPlot::AllPlot(AllPlotWindow *parent, Context *context, RideFile::SeriesType s
     referencePlot = NULL;
     tooltip = NULL;
     _canvasPicker = NULL;
+
+    // curve color object
+    curveColors = new CurveColors(this);
 
     // create a background object for shading
     bg = new AllPlotBackground(this);
@@ -558,6 +562,10 @@ AllPlot::AllPlot(AllPlotWindow *parent, Context *context, RideFile::SeriesType s
     setAxisMaxMinor(QwtAxisId(QwtAxis::yRight, 1), 0);
 
     axisWidget(QwtPlot::yLeft)->installEventFilter(this);
+    axisWidget(QwtPlot::yRight)->installEventFilter(this);
+    axisWidget(QwtAxisId(QwtAxis::yLeft, 1))->installEventFilter(this);
+    axisWidget(QwtAxisId(QwtAxis::yRight, 1))->installEventFilter(this);
+    axisWidget(QwtAxisId(QwtAxis::yRight, 2))->installEventFilter(this);
 
     configChanged(); // set colors
 }
@@ -1932,6 +1940,9 @@ AllPlot::setDataFromPlot(AllPlot *plot, int startidx, int stopidx)
 
     //if (this->legend()) this->legend()->show();
     //replot();
+
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 void
@@ -2245,6 +2256,9 @@ AllPlot::setDataFromPlot(AllPlot *plot)
         refreshZoneLabels();
 #endif
     }
+
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 void
@@ -2606,6 +2620,9 @@ AllPlot::setDataFromPlots(QList<AllPlot *> plots)
 #if 0
 #endif
 #endif
+
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 // used to setup array of allplots where there is one for
@@ -2772,6 +2789,9 @@ AllPlot::setDataFromObject(AllPlotObject *object, AllPlot *reference)
     } else
         bg->detach();
 
+    // remember the curves and colors
+    curveColors->saveState();
+
     replot();
 }
 
@@ -2789,6 +2809,9 @@ AllPlot::setDataFromRide(RideItem *_rideItem)
     standard->curveTitle.setLabel(QwtText(QString(""), QwtText::PlainText)); // default to no title
 
     setDataFromRideFile(rideItem->ride(), standard);
+
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 void
@@ -2968,6 +2991,8 @@ AllPlot::setDataFromRideFile(RideFile *ride, AllPlotObject *here)
         if (maxSECS > here->maxSECS) here->maxSECS = maxSECS;
     }
 
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 void
@@ -2984,6 +3009,9 @@ AllPlot::setShowPower(int id)
         refreshZoneLabels();
     } else
         bg->detach();
+
+    // remember the curves and colors
+    curveColors->saveState();
 }
 
 void
@@ -2992,6 +3020,9 @@ AllPlot::setShowNP(bool show)
     showNP = show;
     standard->npCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3001,6 +3032,9 @@ AllPlot::setShowXP(bool show)
     showXP = show;
     standard->xpCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3010,6 +3044,9 @@ AllPlot::setShowAP(bool show)
     showAP = show;
     standard->apCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3019,6 +3056,9 @@ AllPlot::setShowHr(bool show)
     showHr = show;
     standard->hrCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3028,6 +3068,9 @@ AllPlot::setShowSpeed(bool show)
     showSpeed = show;
     standard->speedCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3037,6 +3080,9 @@ AllPlot::setShowCad(bool show)
     showCad = show;
     standard->cadCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3046,6 +3092,9 @@ AllPlot::setShowAlt(bool show)
     showAlt = show;
     standard->altCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3055,6 +3104,9 @@ AllPlot::setShowTemp(bool show)
     showTemp = show;
     standard->tempCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3064,6 +3116,9 @@ AllPlot::setShowWind(bool show)
     showWind = show;
     standard->windCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3077,6 +3132,9 @@ AllPlot::setShowW(bool show)
         standard->curveTitle.setLabel(QwtText(""));
     }
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3086,6 +3144,9 @@ AllPlot::setShowTorque(bool show)
     showTorque = show;
     standard->torqueCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3096,6 +3157,9 @@ AllPlot::setShowBalance(bool show)
     standard->balanceLCurve->setVisible(show);
     standard->balanceRCurve->setVisible(show);
     setYMax();
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3103,6 +3167,9 @@ void
 AllPlot::setShowGrid(bool show)
 {
     standard->grid->setVisible(show);
+
+    // remember the curves and colors
+    curveColors->saveState();
     replot();
 }
 
@@ -3338,7 +3405,7 @@ QRectF IntervalPlotData::boundingRect() const
 void
 AllPlot::pointHover(QwtPlotCurve *curve, int index)
 {
-    if (index >= 0 && curve != standard->intervalHighlighterCurve) {
+    if (index >= 0 && curve != standard->intervalHighlighterCurve && curve->isVisible()) {
 
         double yvalue = curve->sample(index).y();
         double xvalue = curve->sample(index).x();
@@ -3361,10 +3428,18 @@ AllPlot::pointHover(QwtPlotCurve *curve, int index)
         // set that text up
         tooltip->setText(text);
 
+        // isolate me -- maybe do this via the legend ?
+        //curveColors->isolate(curve);
+        //replot();
+
     } else {
 
         // no point
         tooltip->setText("");
+
+        // get colors back -- maybe do this via the legend?
+        //curveColors->restoreState();
+        //replot();
     }
 }
 
@@ -3403,20 +3478,80 @@ AllPlot::eventFilter(QObject *obj, QEvent *event)
     if (axis>-1 && event->type() == QEvent::MouseButtonDblClick) {
         QMouseEvent *m = static_cast<QMouseEvent*>(event);
         confirmTmpReference(invTransform(axis, m->y()),axis, true); // do show delete stuff
+        return false;
     }
     if (axis>-1 && event->type() == QEvent::MouseMove) {
         QMouseEvent *m = static_cast<QMouseEvent*>(event);
         plotTmpReference(axis, m->x()-axisWidget(axis)->width(), m->y());
+        return false;
     }
     if (axis>-1 && event->type() == QEvent::MouseButtonRelease) {
         QMouseEvent *m = static_cast<QMouseEvent*>(event);
         if (m->x()>axisWidget(axis)->width()) {
             confirmTmpReference(invTransform(axis, m->y()),axis,false); // don't show delete stuff
-        }
-        else  {
+            return false;
+        } else  if (standard->tmpReferenceLines.count()) {
             plotTmpReference(axis, 0, 0); //unplot
+            return true;
         }
     }
+
+    // is it for other objects ?
+    QList<QObject*> axes;
+    QList<QwtAxisId> axesId;
+
+    axes << axisWidget(QwtPlot::yLeft);
+    axesId << QwtPlot::yLeft;
+
+    axes << axisWidget(QwtAxisId(QwtAxis::yLeft, 1));
+    axesId << QwtAxisId(QwtAxis::yLeft, 1);
+
+    axes << axisWidget(QwtPlot::yRight);
+    axesId << QwtPlot::yRight;
+
+    axes << axisWidget(QwtAxisId(QwtAxis::yRight, 1));
+    axesId << QwtAxisId(QwtAxis::yRight, 1);
+
+    axes << axisWidget(QwtAxisId(QwtAxis::yRight, 2));
+    axesId << QwtAxisId(QwtAxis::yRight, 2);
+
+    if (axes.contains(obj)) {
+
+        QwtAxisId id = axesId.at(axes.indexOf(obj));
+
+        // this is an axes widget
+        //qDebug()<<"event on="<<id<< static_cast<QwtScaleWidget*>(obj)->title().text() <<"event="<<event->type();
+
+        // isolate / restore on mouse enter leave
+        if (!isolation && event->type() == QEvent::Enter) {
+
+            // isolate curve on hover
+            curveColors->isolateAxis(id);
+            replot();
+
+        } else if (!isolation && event->type() == QEvent::Leave) {
+
+            // return to normal when leave
+            curveColors->restoreState();
+            replot();
+
+        } else if (event->type() == QEvent::MouseButtonRelease) {
+
+            // click on any axis to toggle isolation
+            // if isolation is on, just turns it off
+            // if isolation is off, turns it on for the axis clicked
+            if (isolation) {
+                isolation = false;
+                curveColors->restoreState();
+                replot();
+            } else {
+                isolation = true;
+                curveColors->isolateAxis(id);
+                replot();
+            }
+        }
+    }
+
     return false;
 }
 

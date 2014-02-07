@@ -46,8 +46,8 @@
 
 #include <math.h> // for isinf() isnan()
 
-LTMPlot::LTMPlot(LTMWindow *parent, Context *context) : 
-    bg(NULL), parent(parent), context(context), highlighter(NULL)
+LTMPlot::LTMPlot(LTMWindow *parent, Context *context, bool first) : 
+    bg(NULL), parent(parent), context(context), highlighter(NULL), first(first)
 {
     // don't do this ..
     setAutoReplot(false);
@@ -103,12 +103,27 @@ LTMPlot::LTMPlot(LTMWindow *parent, Context *context) :
     grid->enableX(false);
     grid->attach(this);
 
+    // manage our own picker
+    picker = new LTMToolTip(QwtPlot::xBottom, QwtPlot::yLeft, QwtPicker::VLineRubberBand, QwtPicker::AlwaysOn, canvas(), "");
+    picker->setMousePattern(QwtEventPattern::MouseSelect1, Qt::LeftButton);
+    picker->setTrackerPen(QColor(Qt::black));
+
+    QColor inv(Qt::white);
+    inv.setAlpha(0);
+    picker->setRubberBandPen(inv); // make it invisible
+    picker->setEnabled(true);
+    _canvasPicker = new LTMCanvasPicker(this);
+
     settings = NULL;
     cogganPMC = skibaPMC = NULL; // cache when replotting a PMC
 
     configUpdate(); // set basic colors
 
     connect(context, SIGNAL(configChanged()), this, SLOT(configUpdate()));
+    // connect pickers to ltmPlot
+    connect(_canvasPicker, SIGNAL(pointHover(QwtPlotCurve*, int)), this, SLOT(pointHover(QwtPlotCurve*, int)));
+    connect(_canvasPicker, SIGNAL(pointClicked(QwtPlotCurve*, int)), this, SLOT(pointClicked(QwtPlotCurve*, int)));
+
 }
 
 LTMPlot::~LTMPlot()
@@ -226,6 +241,14 @@ LTMPlot::setData(LTMSettings *set)
         delete label;
     }
     labels.clear();
+    // clear old markers - if there are any
+    foreach(QwtPlotMarker *m, markers) {
+        m->detach();
+        delete m;
+    }
+    markers.clear();
+
+
 
     // disable all y axes until we have populated
     for (int i=0; i<8; i++) {
@@ -255,7 +278,7 @@ LTMPlot::setData(LTMSettings *set)
         refreshZoneLabels(-1);
 
         // remove the old markers
-        refreshMarkers(settings->start.date(), settings->end.date(), settings->groupBy);
+        refreshMarkers(settings, settings->start.date(), settings->end.date(), settings->groupBy, GColor(CPLOTMARKER));
 
         replot();
         return;
@@ -1076,8 +1099,8 @@ LTMPlot::setData(LTMSettings *set)
     }
 
     QString format = axisTitle(yLeft).text();
-    parent->toolTip()->setAxes(xBottom, yLeft);
-    parent->toolTip()->setFormat(format);
+    picker->setAxes(xBottom, yLeft);
+    picker->setFormat(format);
 
     // draw zone labels axisid of -1 means delete whats there
     // cause no watts are being displayed
@@ -1102,7 +1125,7 @@ LTMPlot::setData(LTMSettings *set)
 
     // markers
     if (settings->groupBy != LTM_TOD)
-        refreshMarkers(settings->start.date(), settings->end.date(), settings->groupBy);
+        refreshMarkers(settings, settings->start.date(), settings->end.date(), settings->groupBy, GColor(CPLOTMARKER));
 
     //qDebug()<<"Final tidy.."<<timer.elapsed();
 
@@ -1119,7 +1142,7 @@ LTMPlot::setCompareData(LTMSettings *set)
     QTime timer;
     timer.start();
 
-    double MAXX=0.0; // maximum value for x, always from 0-n
+    MAXX=0.0; // maximum value for x, always from 0-n
 
     //qDebug()<<"Starting.."<<timer.elapsed();
 
@@ -1143,6 +1166,13 @@ LTMPlot::setCompareData(LTMSettings *set)
         delete label;
     }
     labels.clear();
+    // clear old markers - if there are any
+    foreach(QwtPlotMarker *m, markers) {
+        m->detach();
+        delete m;
+    }
+    markers.clear();
+
 
     // disable all y axes until we have populated
     for (int i=0; i<8; i++) {
@@ -1375,6 +1405,8 @@ LTMPlot::setCompareData(LTMSettings *set)
                 left = (space * barn) + (gap / 2) + 0.1;
                 right = left + width;
 
+                //left -= 1.00f;
+                //right -= 1.00f;
                 //left -= 0.5 + gap;
                 //right -= 0.5 + gap;
             }
@@ -1525,7 +1557,7 @@ LTMPlot::setCompareData(LTMSettings *set)
                 // need to take into account the space it will
                 // consume when plotted in the second iteration
                 // below this one
-                int barn = cdCount;
+                int barn = cdCount-1;
 
                 double space = double(0.9) / bars;
                 double gap = space * 0.10;
@@ -1533,6 +1565,7 @@ LTMPlot::setCompareData(LTMSettings *set)
                 left = (space * barn) + (gap / 2) + 0.1;
                 right = left + width;
                 middle = ((left+right) / double(2)) - 0.5;
+
             }
 
             // trend - clone the data for the curve and add a curvefitted
@@ -2012,6 +2045,11 @@ LTMPlot::setCompareData(LTMSettings *set)
             current->attach(this);
 
         }
+
+        // lastly set markers using the right color
+        if (settings->groupBy != LTM_TOD) 
+            refreshMarkers(settings, settings->start.date(), settings->end.date(), settings->groupBy, cd.color);
+
     }
 
     //qDebug()<<"Second plotting iteration.."<<timer.elapsed();
@@ -2075,8 +2113,8 @@ LTMPlot::setCompareData(LTMSettings *set)
     }
 
     QString format = axisTitle(yLeft).text();
-    parent->toolTip()->setAxes(xBottom, yLeft);
-    parent->toolTip()->setFormat(format);
+    picker->setAxes(xBottom, yLeft);
+    picker->setFormat(format);
 
     // show legend?
     if (settings->legend == false) this->legend()->hide();
@@ -2096,17 +2134,32 @@ LTMPlot::setCompareData(LTMSettings *set)
     // now refresh
     updateLegend();
 
-    // markers
-    //if (settings->groupBy != LTM_TOD)
-    //    refreshMarkers(settings->start.date(), settings->end.date(), settings->groupBy);
-
-    //qDebug()<<"Final tidy.."<<timer.elapsed();
-
     // plot
     replot();
 
     //qDebug()<<"Replot and done.."<<timer.elapsed();
 
+}
+
+int
+LTMPlot::getMaxX()
+{
+    return MAXX;
+}
+
+void
+LTMPlot::setMaxX(int x)
+{
+    MAXX = x;
+
+    int tics;
+    if (MAXX < 14) {
+        tics = 1;
+    } else {
+        tics = 1 + MAXX/10;
+    }
+    setAxisScale(xBottom, -0.498f, MAXX+0.498f, tics);
+    setAxisScaleDraw(QwtPlot::xBottom, new CompareScaleDraw());
 }
 
 void
@@ -2242,7 +2295,7 @@ LTMPlot::createCurveData(Context *context, LTMSettings *settings, MetricDetail m
             if (metricDetail.type == METRIC_BEST || metricDetail.type == METRIC_MEASURE) seconds = 1;
             if (currentDay > lastDay) {
                 if (lastDay && wantZero) {
-                    while (n < (x.size()-1) && lastDay<currentDay) {
+                    while (lastDay<currentDay) {
                         lastDay++;
                         n++;
                         x[n]=lastDay - groupForDate(settings->start.date(), settings->groupBy);
@@ -2265,7 +2318,7 @@ LTMPlot::createCurveData(Context *context, LTMSettings *settings, MetricDetail m
                 if (metricDetail.type == METRIC_BEST) type = RideMetric::Peak;
 
                 // first time thru
-                if (n<0) n++;
+                //if (n<0) n++;
 
                 switch (type) {
                 case RideMetric::Total:
@@ -2444,15 +2497,17 @@ LTMPlot::pointHover(QwtPlotCurve *curve, int index)
         int precision = 0;
         QString datestr;
 
-        LTMScaleDraw *lsd = new LTMScaleDraw(settings->start, groupForDate(settings->start.date(), settings->groupBy), settings->groupBy);
-        QwtText startText = lsd->label((int)(curve->sample(index).x()+0.5));
+        if (!parent->isCompare()) {
+            LTMScaleDraw *lsd = new LTMScaleDraw(settings->start, groupForDate(settings->start.date(), settings->groupBy), settings->groupBy);
+            QwtText startText = lsd->label((int)(curve->sample(index).x()+0.5));
 
-        if (settings->groupBy != LTM_WEEK)
-            datestr = startText.text();
-        else
-            datestr = QString(tr("Week Commencing %1")).arg(startText.text());
+            if (settings->groupBy != LTM_WEEK)
+                datestr = startText.text();
+            else
+                datestr = QString(tr("Week Commencing %1")).arg(startText.text());
 
-        datestr = datestr.replace('\n', ' ');
+            datestr = datestr.replace('\n', ' ');
+        }
 
         // we reference the metric definitions of name and
         // units to decide on the level of precision required
@@ -2489,23 +2544,34 @@ LTMPlot::pointHover(QwtPlotCurve *curve, int index)
         }
 
         // output the tooltip
-        QString text = QString("%1\n%2\n%3 %4")
+        QString text;
+        if (!parent->isCompare()) {
+            text = QString("%1\n%2\n%3 %4")
                         .arg(datestr)
                         .arg(curve->title().text())
                         .arg(value, 0, 'f', precision)
                         .arg(this->axisTitle(curve->yAxis()).text());
+        } else {
+            text = QString("%1\n%2 %3")
+                        .arg(curve->title().text())
+                        .arg(value, 0, 'f', precision)
+                        .arg(this->axisTitle(curve->yAxis()).text());
+        }
 
         // set that text up
-        parent->toolTip()->setText(text);
+        picker->setText(text);
     } else {
         // no point
-        parent->toolTip()->setText("");
+        picker->setText("");
     }
 }
 
 void
 LTMPlot::pointClicked(QwtPlotCurve *curve, int index)
 {
+    // do nothin on a compare chart
+    if (parent->isCompare()) return;
+
     if (index >= 0 && curve != highlighter) {
         // setup the popup
         parent->pointClicked(curve, index);
@@ -2667,19 +2733,13 @@ class LTMPlotZoneLabel: public QwtPlotItem
 };
 
 void
-LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
+LTMPlot::refreshMarkers(LTMSettings *settings, QDate from, QDate to, int groupby, QColor color)
 {
-    // clear old markers - if there are any
-    foreach(QwtPlotMarker *m, markers) {
-        m->detach();
-        delete m;
-    }
-    markers.clear();
-
     double baseday = groupForDate(from, groupby);
 
     // seasons and season events
     if (settings->events) {
+
         foreach (Season s, context->athlete->seasons->seasons) {
 
             if (s.type != Season::temporary && s.name != settings->title && s.getStart() >= from && s.getStart() < to) {
@@ -2689,16 +2749,19 @@ LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
                 mrk->attach(this);
                 mrk->setLineStyle(QwtPlotMarker::VLine);
                 mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-                mrk->setLinePen(QPen(GColor(CPLOTMARKER), 0, Qt::DashDotLine));
-
-                QwtText text(s.getName());
-                text.setFont(QFont("Helvetica", 10, QFont::Bold));
-                text.setColor(GColor(CPLOTMARKER));
+                mrk->setLinePen(QPen(color, 0, Qt::DashDotLine));
                 mrk->setValue(double(groupForDate(s.getStart(), groupby)) - baseday, 0.0);
-                mrk->setLabel(text);
+
+                if (first) {
+                    QwtText text(s.getName());
+                    text.setFont(QFont("Helvetica", 10, QFont::Bold));
+                    text.setColor(color);
+                    mrk->setLabel(text);
+                }
             }
 
             foreach (SeasonEvent event, s.events) {
+
 
                 if (event.date > from && event.date < to) {
 
@@ -2708,13 +2771,16 @@ LTMPlot::refreshMarkers(QDate from, QDate to, int groupby)
                     mrk->attach(this);
                     mrk->setLineStyle(QwtPlotMarker::VLine);
                     mrk->setLabelAlignment(Qt::AlignRight | Qt::AlignTop);
-                    mrk->setLinePen(QPen(GColor(CPLOTMARKER), 0, Qt::DashDotLine));
-
-                    QwtText text(event.name);
-                    text.setFont(QFont("Helvetica", 10, QFont::Bold));
-                    text.setColor(GColor(CPLOTMARKER));
+                    mrk->setLinePen(QPen(color, 0, Qt::DashDotLine));
                     mrk->setValue(double(groupForDate(event.date, groupby)) - baseday, 10.0);
-                    mrk->setLabel(text);
+
+                    if (first) {
+                        QwtText text(event.name);
+                        text.setFont(QFont("Helvetica", 10, QFont::Bold));
+                        text.setColor(color);
+                        mrk->setLabel(text);
+                    }
+
                 }
             }
         }
