@@ -1144,7 +1144,7 @@ AllPlot::recalc(AllPlotObject *objects)
     // set curves - we set the intervalHighlighter to whichver is available
 
     //W' curve set to whatever data we have
-    if (rideItem && rideItem->ride()) {
+    if (rideItem && rideItem->ride() && objects->wCurve->isVisible()) {
         objects->wCurve->setSamples(rideItem->ride()->wprimeData()->xdata().data(), rideItem->ride()->wprimeData()->ydata().data(), rideItem->ride()->wprimeData()->xdata().count());
         objects->mCurve->setSamples(rideItem->ride()->wprimeData()->mxdata().data(), rideItem->ride()->wprimeData()->mydata().data(), rideItem->ride()->wprimeData()->mxdata().count());
     }
@@ -1309,6 +1309,7 @@ AllPlot::refreshReferenceLines()
         scope != RideFile::NP && scope != RideFile::aPower && scope != RideFile::xPower) return;
 
     foreach(QwtPlotCurve *referenceLine, standard->referenceLines) {
+        curveColors->remove(referenceLine);
         referenceLine->detach();
         delete referenceLine;
     }
@@ -1373,6 +1374,7 @@ AllPlot::plotReferenceLine(const RideFilePoint *referencePoint)
     }
 
     if (referenceLine) {
+        curveColors->insert(referenceLine);
         referenceLine->setSamples(xaxis,yaxis);
         referenceLine->attach(this);
         referenceLine->setVisible(true);
@@ -1386,7 +1388,7 @@ void
 AllPlot::setYMax()
 {
     // set axis scales
-    if (standard->wCurve->isVisible() && rideItem && rideItem->ride()) {
+    if (showW && standard->wCurve->isVisible() && rideItem && rideItem->ride()) {
 
         setAxisTitle(QwtAxisId(QwtAxis::yRight, 2), tr("W' Balance (j)"));
         setAxisScale(QwtAxisId(QwtAxis::yRight, 2),rideItem->ride()->wprimeData()->minY-1000,rideItem->ride()->wprimeData()->maxY+1000);
@@ -1701,8 +1703,10 @@ AllPlot::setDataFromPlot(AllPlot *plot, int startidx, int stopidx)
     standard->balanceLCurve->setVisible(rideItem->ride()->areDataPresent()->lrbalance && showBalance);
     standard->balanceRCurve->setVisible(rideItem->ride()->areDataPresent()->lrbalance && showBalance);
 
-    standard->wCurve->setSamples(rideItem->ride()->wprimeData()->xdata().data(),rideItem->ride()->wprimeData()->ydata().data(),rideItem->ride()->wprimeData()->xdata().count());
-    standard->mCurve->setSamples(rideItem->ride()->wprimeData()->mxdata().data(),rideItem->ride()->wprimeData()->mydata().data(),rideItem->ride()->wprimeData()->mxdata().count());
+    if (showW) {
+        standard->wCurve->setSamples(rideItem->ride()->wprimeData()->xdata().data(),rideItem->ride()->wprimeData()->ydata().data(),rideItem->ride()->wprimeData()->xdata().count());
+        standard->mCurve->setSamples(rideItem->ride()->wprimeData()->mxdata().data(),rideItem->ride()->wprimeData()->mydata().data(),rideItem->ride()->wprimeData()->mxdata().count());
+    }
     standard->wattsCurve->setSamples(xaxis,smoothW,stopidx-startidx);
     standard->npCurve->setSamples(xaxis,smoothN,stopidx-startidx);
     standard->xpCurve->setSamples(xaxis,smoothX,stopidx-startidx);
@@ -1882,7 +1886,7 @@ AllPlot::setDataFromPlot(AllPlot *plot, int startidx, int stopidx)
         standard->altCurve->attach(this);
         standard->intervalHighlighterCurve->setYAxis(QwtAxisId(QwtAxis::yRight, 1));
     }
-    if (rideItem->ride()->wprimeData()->xdata().count()) {
+    if (showW && rideItem->ride()->wprimeData()->xdata().count()) {
         standard->wCurve->attach(this);
         standard->mCurve->attach(this);
     }
@@ -1942,6 +1946,7 @@ AllPlot::setDataFromPlot(AllPlot *plot, int startidx, int stopidx)
     //replot();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
@@ -2258,12 +2263,16 @@ AllPlot::setDataFromPlot(AllPlot *plot)
     }
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
 void
 AllPlot::setDataFromPlots(QList<AllPlot *> plots)
 {
+    isolation = false;
+    curveColors->saveState();
+
     // remove all curves from the plot
     standard->wCurve->detach();
     standard->mCurve->detach();
@@ -2622,6 +2631,7 @@ AllPlot::setDataFromPlots(QList<AllPlot *> plots)
 #endif
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
@@ -2790,6 +2800,7 @@ AllPlot::setDataFromObject(AllPlotObject *object, AllPlot *reference)
         bg->detach();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 
     replot();
@@ -2811,6 +2822,7 @@ AllPlot::setDataFromRide(RideItem *_rideItem)
     setDataFromRideFile(rideItem->ride(), standard);
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
@@ -2857,7 +2869,7 @@ AllPlot::setDataFromRideFile(RideFile *ride, AllPlotObject *here)
         if (!here->npArray.empty()) here->npCurve->attach(this);
         if (!here->xpArray.empty()) here->xpCurve->attach(this);
         if (!here->apArray.empty()) here->apCurve->attach(this);
-        if (ride && !ride->wprimeData()->ydata().empty()) {
+        if (showW && ride && !ride->wprimeData()->ydata().empty()) {
             here->wCurve->attach(this);
             here->mCurve->attach(this);
         }
@@ -2977,6 +2989,7 @@ AllPlot::setDataFromRideFile(RideFile *ride, AllPlotObject *here)
         here->cal_mrk.clear();
 
         foreach(QwtPlotCurve *referenceLine, here->referenceLines) {
+            curveColors->remove(referenceLine);
             referenceLine->detach();
             delete referenceLine;
         }
@@ -2992,6 +3005,7 @@ AllPlot::setDataFromRideFile(RideFile *ride, AllPlotObject *here)
     }
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
@@ -3011,6 +3025,7 @@ AllPlot::setShowPower(int id)
         bg->detach();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
 }
 
@@ -3022,6 +3037,7 @@ AllPlot::setShowNP(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3034,6 +3050,7 @@ AllPlot::setShowXP(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3046,6 +3063,7 @@ AllPlot::setShowAP(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3058,6 +3076,7 @@ AllPlot::setShowHr(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3070,6 +3089,7 @@ AllPlot::setShowSpeed(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3082,6 +3102,7 @@ AllPlot::setShowCad(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3094,6 +3115,7 @@ AllPlot::setShowAlt(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3106,6 +3128,7 @@ AllPlot::setShowTemp(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3118,6 +3141,7 @@ AllPlot::setShowWind(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3134,6 +3158,7 @@ AllPlot::setShowW(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3146,6 +3171,7 @@ AllPlot::setShowTorque(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3159,6 +3185,7 @@ AllPlot::setShowBalance(bool show)
     setYMax();
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3169,6 +3196,7 @@ AllPlot::setShowGrid(bool show)
     standard->grid->setVisible(show);
 
     // remember the curves and colors
+    isolation = false;
     curveColors->saveState();
     replot();
 }
@@ -3247,6 +3275,12 @@ void
 AllPlot::setSmoothing(int value)
 {
     smooth = value;
+
+    // if anything is going on, lets stop it now!
+    // ACTUALLY its quite handy to play with smooting!
+    isolation = false;
+    curveColors->restoreState();
+
     recalc(standard);
 }
 
@@ -3255,6 +3289,11 @@ AllPlot::setByDistance(int id)
 {
     bydist = (id == 1);
     setXTitle();
+
+    // if anything is going on, lets stop it now!
+    isolation = false;
+    curveColors->restoreState();
+
     recalc(standard);
 }
 
@@ -3471,28 +3510,35 @@ AllPlot::nextStep( int& step )
 bool
 AllPlot::eventFilter(QObject *obj, QEvent *event)
 {
-    int axis = -1;
-    if (obj == axisWidget(QwtPlot::yLeft))
-        axis=QwtPlot::yLeft;
 
-    if (axis>-1 && event->type() == QEvent::MouseButtonDblClick) {
-        QMouseEvent *m = static_cast<QMouseEvent*>(event);
-        confirmTmpReference(invTransform(axis, m->y()),axis, true); // do show delete stuff
-        return false;
-    }
-    if (axis>-1 && event->type() == QEvent::MouseMove) {
-        QMouseEvent *m = static_cast<QMouseEvent*>(event);
-        plotTmpReference(axis, m->x()-axisWidget(axis)->width(), m->y());
-        return false;
-    }
-    if (axis>-1 && event->type() == QEvent::MouseButtonRelease) {
-        QMouseEvent *m = static_cast<QMouseEvent*>(event);
-        if (m->x()>axisWidget(axis)->width()) {
-            confirmTmpReference(invTransform(axis, m->y()),axis,false); // don't show delete stuff
+    // if power is going on we worry about reference lines
+    // otherwise not so much ..
+    if ((showPowerState<2 && scope == RideFile::none) || scope == RideFile::watts ||
+        scope == RideFile::NP || scope == RideFile::aPower || scope == RideFile::xPower) {
+
+        int axis = -1;
+        if (obj == axisWidget(QwtPlot::yLeft))
+            axis=QwtPlot::yLeft;
+
+        if (axis>-1 && event->type() == QEvent::MouseButtonDblClick) {
+            QMouseEvent *m = static_cast<QMouseEvent*>(event);
+            confirmTmpReference(invTransform(axis, m->y()),axis, true); // do show delete stuff
             return false;
-        } else  if (standard->tmpReferenceLines.count()) {
-            plotTmpReference(axis, 0, 0); //unplot
-            return true;
+        }
+        if (axis>-1 && event->type() == QEvent::MouseMove) {
+            QMouseEvent *m = static_cast<QMouseEvent*>(event);
+            plotTmpReference(axis, m->x()-axisWidget(axis)->width(), m->y());
+            return false;
+        }
+        if (axis>-1 && event->type() == QEvent::MouseButtonRelease) {
+            QMouseEvent *m = static_cast<QMouseEvent*>(event);
+            if (m->x()>axisWidget(axis)->width()) {
+                confirmTmpReference(invTransform(axis, m->y()),axis,false); // don't show delete stuff
+                return false;
+            } else  if (standard->tmpReferenceLines.count()) {
+                plotTmpReference(axis, 0, 0); //unplot
+                return true;
+            }
         }
     }
 
@@ -3572,6 +3618,7 @@ AllPlot::plotTmpReference(int axis, int x, int y)
 
         foreach(QwtPlotCurve *curve, standard->tmpReferenceLines) {
             if (curve) {
+                curveColors->remove(curve); // ignored if not already there
                 curve->detach();
                 delete curve;
             }
@@ -3609,6 +3656,7 @@ AllPlot::plotTmpReference(int axis, int x, int y)
         // wipe any we don't want
         foreach(QwtPlotCurve *curve, standard->tmpReferenceLines) {
             if (curve) {
+                curveColors->remove(curve); // ignored if not already there
                 curve->detach();
                 delete curve;
             }
