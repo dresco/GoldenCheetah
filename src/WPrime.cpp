@@ -465,7 +465,8 @@ WPrime::PCP()
     if (PCP_) return PCP_;
 
     // check WPRIME is correct otherwise we will run forever!
-    if (WPRIME < 10000) return PCP_ = CP; // Wprime not set properly
+    // if its way off don't even try!
+    if (minY < -10000 || WPRIME < 10000) return PCP_ = 0; // Wprime not set properly
 
     int cp = CP;
     do {
@@ -723,7 +724,7 @@ class WPrimeExp : public RideMetric {
         double total = 0;
         double secs = 0;
         foreach(const RideFilePoint *point, r->dataPoints()) {
-            if (cp && point->watts > cp) total += point->watts;
+            if (cp && point->watts > cp) total += r->recIntSecs() * point->watts;
             secs += r->recIntSecs();
         }
         setValue(total/1000.00f);

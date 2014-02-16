@@ -55,6 +55,7 @@ PowerHist::PowerHist(Context *context, bool rangemode) :
     lny(false),
     shade(false),
     zoned(false),
+    cpzoned(false),
     binw(3),
     withz(true),
     dt(1),
@@ -309,6 +310,13 @@ PowerHist::recalcCompare()
         ((rangemode && !context->isCompareDateRanges)
         || (!rangemode && !context->isCompareIntervals))) return;
 
+    // zap any zone data labels
+    foreach (QwtPlotMarker *label, zoneDataLabels) {
+        label->detach();
+        delete label;
+    }
+    zoneDataLabels.clear();
+
     // loop through intervals or dateranges, depending upon mode
     // counting columns
     double ncols = 0;
@@ -343,8 +351,16 @@ PowerHist::recalcCompare()
 
         } else if ((series == RideFile::watts || series == RideFile::wattsKg) && zoned == true) {
 
-            array = &cid.wattsZoneArray;
-            arrayLength = cid.wattsZoneArray.size();
+            if (cpzoned) {
+
+                array = &cid.wattsCPZoneArray;
+                arrayLength = cid.wattsCPZoneArray.size();
+
+            } else {
+
+                array = &cid.wattsZoneArray;
+                arrayLength = cid.wattsZoneArray.size();
+            }
 
         } else if (series == RideFile::aPower && zoned == false) {
 
@@ -459,6 +475,10 @@ PowerHist::recalcCompare()
     
         } else { // ZONED
 
+            QFont labelFont;
+            labelFont.fromString(appsettings->value(this, GC_FONT_CHARTLABELS, QFont().toString()).toString());
+            labelFont.setPointSize(appsettings->value(NULL, GC_FONT_CHARTLABELS_SIZE, 8).toInt());
+
             // 0.625 = golden ratio for gaps betwen group of cols
             // 0.9 = 10% space between each col in group
 
@@ -470,6 +490,10 @@ PowerHist::recalcCompare()
             // Each zone column will have 4 points
             QVector<double> xaxis (array->size() * 4);
             QVector<double> yaxis (array->size() * 4);
+
+            // so we can calculate percentage for the labels
+            double total=0;
+            for (int i=0; i<array->size(); i++) total += dt * (double)(*array)[i];
 
             // samples to time
             for (int i=0, offset=0; i<array->size(); i++) {
@@ -489,6 +513,30 @@ PowerHist::recalcCompare()
                 xaxis[offset] = x +jump +width;
                 yaxis[offset] = 0;
                 offset++;
+
+                double yval = absolutetime ? y : (y /total * 100.00f);
+
+                if (yval > 0) {
+
+                    QColor color = rangemode ? context->compareDateRanges[intervalNumber].color.darker(200)
+                                             : context->compareIntervals[intervalNumber].color.darker(200);
+
+                    // now add a label above the bar
+                    QwtPlotMarker *label = new QwtPlotMarker();
+                    QwtText text(QString("%1%2").arg(int(yval)).arg(absolutetime ? "" : "%"), QwtText::PlainText);
+                    text.setFont(labelFont);
+                    text.setColor(color);
+                    label->setLabel(text);
+                    label->setValue(x+jump+(width/2.00f), yval);
+                    label->setYAxis(QwtPlot::yLeft);
+                    label->setSpacing(5); // not px but by yaxis value !? mad.
+                    label->setLabelAlignment(Qt::AlignTop | Qt::AlignCenter);
+            
+                    // and attach
+                    label->attach(this);
+                    zoneDataLabels << label;
+
+                }
             }
 
             if (!absolutetime) {
@@ -502,20 +550,27 @@ PowerHist::recalcCompare()
             //
             // POWER ZONES
             //
-            const Zones *zones;
-            int zone_range = -1;
-            zones = context->athlete->zones();
+            if (cpzoned) {
 
-            if (zones) {
-                if (context->compareIntervals.count())
-                    zone_range = zones->whichRange(context->compareIntervals[0].data->startTime().date());
-                if (zone_range == -1) zone_range = zones->whichRange(QDate::currentDate());
+                setAxisScaleDraw(QwtPlot::xBottom, new PolarisedZoneScaleDraw());
+                setAxisScale(QwtPlot::xBottom, -0.99, 3, 1);
 
-            }
-            if (zones && zone_range != -1) {
-                if ((series == RideFile::watts || series == RideFile::wattsKg)) {
-                    setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(zones, zone_range));
-                    setAxisScale(QwtPlot::xBottom, -0.99, zones->numZones(zone_range), 1);
+            } else {
+                const Zones *zones;
+                int zone_range = -1;
+                zones = context->athlete->zones();
+
+                if (zones) {
+                    if (context->compareIntervals.count())
+                        zone_range = zones->whichRange(context->compareIntervals[0].data->startTime().date());
+                    if (zone_range == -1) zone_range = zones->whichRange(QDate::currentDate());
+
+                }
+                if (zones && zone_range != -1) {
+                    if ((series == RideFile::watts || series == RideFile::wattsKg)) {
+                        setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(zones, zone_range));
+                        setAxisScale(QwtPlot::xBottom, -0.99, zones->numZones(zone_range), 1);
+                    }
                 }
             }
 
@@ -582,6 +637,7 @@ PowerHist::recalc(bool force)
         LASTuseMetricUnits == context->athlete->useMetricUnits &&
         LASTlny == lny &&
         LASTzoned == zoned &&
+        LASTcpzoned == cpzoned &&
         LASTbinw == binw &&
         LASTwithz == withz &&
         LASTdt == dt &&
@@ -599,6 +655,7 @@ PowerHist::recalc(bool force)
         LASTuseMetricUnits = context->athlete->useMetricUnits;
         LASTlny = lny;
         LASTzoned = zoned;
+        LASTcpzoned = cpzoned;
         LASTbinw = binw;
         LASTwithz = withz;
         LASTdt = dt;
@@ -606,10 +663,21 @@ PowerHist::recalc(bool force)
     }
 
 
-    if (source == Ride && !rideItem) return;
+    if (source == Ride && !rideItem) { 
+        return;
+    }
 
     // make sure the interval length is set if not plotting metrics
-    if (source != Metric && dt <= 0) return;
+    if (source != Metric && dt <= 0) {
+        return;
+    }
+
+    // zap any zone data labels
+    foreach (QwtPlotMarker *label, zoneDataLabels) {
+        label->detach();
+        delete label;
+    }
+    zoneDataLabels.clear();
 
     if (source == Metric) {
 
@@ -625,10 +693,15 @@ PowerHist::recalc(bool force)
         selectedArray = &standard.wattsSelectedArray;
 
     } else if ((series == RideFile::watts || series == RideFile::wattsKg) && zoned == true) {
-
-        array = &standard.wattsZoneArray;
-        arrayLength = standard.wattsZoneArray.size();
-        selectedArray = &standard.wattsZoneSelectedArray;
+        if (cpzoned) {
+            array = &standard.wattsCPZoneArray;
+            arrayLength = standard.wattsCPZoneArray.size();
+            selectedArray = &standard.wattsCPZoneSelectedArray;
+        } else {
+            array = &standard.wattsZoneArray;
+            arrayLength = standard.wattsZoneArray.size();
+            selectedArray = &standard.wattsZoneSelectedArray;
+        }
 
     } else if (series == RideFile::aPower && zoned == false) {
 
@@ -751,6 +824,10 @@ PowerHist::recalc(bool force)
 
     } else {
 
+        QFont labelFont;
+        labelFont.fromString(appsettings->value(this, GC_FONT_CHARTLABELS, QFont().toString()).toString());
+        labelFont.setPointSize(appsettings->value(NULL, GC_FONT_CHARTLABELS_SIZE, 8).toInt());
+
         // we're not binning instead we are prettyfing the columnar
         // display in much the same way as the weekly summary workds
         // Each zone column will have 4 points
@@ -758,6 +835,10 @@ PowerHist::recalc(bool force)
         QVector<double> yaxis (array->size() * 4);
         QVector<double> selectedxaxis (selectedArray->size() * 4);
         QVector<double> selectedyaxis (selectedArray->size() * 4);
+
+        // so we can calculate percentage for the labels
+        double total=0;
+        for (int i=0; i<array->size(); i++) total += dt * (double)(*array)[i];
 
         // samples to time
         for (int i=0, offset=0; i<array->size(); i++) {
@@ -777,6 +858,28 @@ PowerHist::recalc(bool force)
             xaxis[offset] = x +0.625;
             yaxis[offset] = 0;
             offset++;
+
+            double yval = absolutetime ? y : (y /total * 100.00f);
+
+            if (yval > 0) {
+
+                // now add a label above the bar
+                QwtPlotMarker *label = new QwtPlotMarker();
+                QwtText text(QString("%1%2").arg(int(yval)).arg(absolutetime ? "" : "%"), QwtText::PlainText);
+                text.setFont(labelFont);
+                text.setColor(series == RideFile::watts ? GColor(CPOWER).darker(200) : GColor(CHEARTRATE).darker(200));
+                label->setLabel(text);
+                label->setValue(x+0.312f, yval);
+                label->setYAxis(QwtPlot::yLeft);
+                label->setSpacing(5); // not px but by yaxis value !? mad.
+                label->setLabelAlignment(Qt::AlignTop | Qt::AlignCenter);
+            
+                // and attach
+                label->attach(this);
+                zoneDataLabels << label;
+
+            }
+
         }
 
         for (int i=0, offset=0; i<selectedArray->size(); i++) {
@@ -795,6 +898,7 @@ PowerHist::recalc(bool force)
             selectedxaxis[offset] = x +0.95;
             selectedyaxis[offset] = 0;
             offset++;
+
         }
 
         if (!absolutetime) {
@@ -808,11 +912,17 @@ PowerHist::recalc(bool force)
 
         // zone scale draw
         if ((series == RideFile::watts || series == RideFile::wattsKg) && zoned && rideItem && rideItem->zones) {
-            setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(rideItem->zones, rideItem->zoneRange()));
-            if (rideItem->zoneRange() >= 0)
-                setAxisScale(QwtPlot::xBottom, -0.99, rideItem->zones->numZones(rideItem->zoneRange()), 1);
-            else
-                setAxisScale(QwtPlot::xBottom, -0.99, 0, 1);
+
+            if (cpzoned) {
+                setAxisScaleDraw(QwtPlot::xBottom, new PolarisedZoneScaleDraw());
+                setAxisScale(QwtPlot::xBottom, -0.99, 3, 1);
+            } else {
+                setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(rideItem->zones, rideItem->zoneRange()));
+                if (rideItem->zoneRange() >= 0)
+                    setAxisScale(QwtPlot::xBottom, -0.99, rideItem->zones->numZones(rideItem->zoneRange()), 1);
+                else
+                    setAxisScale(QwtPlot::xBottom, -0.99, 0, 1);
+            }
         }
 
         // hr scale draw
@@ -829,9 +939,14 @@ PowerHist::recalc(bool force)
 
         // watts zoned for a time range
         if (source == Cache && zoned && (series == RideFile::watts || series == RideFile::wattsKg) && context->athlete->zones()) {
-            setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(context->athlete->zones(), 0));
-            if (context->athlete->zones()->getRangeSize())
-                setAxisScale(QwtPlot::xBottom, -0.99, context->athlete->zones()->numZones(0), 1); // use zones from first defined range
+            if (cpzoned) {
+                setAxisScaleDraw(QwtPlot::xBottom, new PolarisedZoneScaleDraw());
+                setAxisScale(QwtPlot::xBottom, -0.99, 3, 1);
+            } else {
+                setAxisScaleDraw(QwtPlot::xBottom, new ZoneScaleDraw(context->athlete->zones(), 0));
+                if (context->athlete->zones()->getRangeSize())
+                    setAxisScale(QwtPlot::xBottom, -0.99, context->athlete->zones()->numZones(0), 1); // use zones from first defined range
+            }
         }
 
         // hr zoned for a time range
@@ -922,6 +1037,7 @@ PowerHist::setData(RideFileCache *cache)
     // the ride cache
     standard.wattsArray.resize(0);
     standard.wattsZoneArray.resize(10);
+    standard.wattsCPZoneArray.resize(3);
     standard.wattsKgArray.resize(0);
     standard.aPowerArray.resize(0);
     standard.nmArray.resize(0);
@@ -964,6 +1080,14 @@ PowerHist::setData(RideFileCache *cache)
         standard.wattsZoneArray[i] = cache->wattsZoneArray()[i];
         standard.hrZoneArray[i] = cache->hrZoneArray()[i];
     }
+
+    // polarised zones
+    standard.wattsCPZoneArray[0] = cache->wattsCPZoneArray()[1];
+    if (withz) {
+        standard.wattsCPZoneArray[0] += cache->wattsCPZoneArray()[0]; // add in zero watts
+    }
+    standard.wattsCPZoneArray[1] = cache->wattsCPZoneArray()[2];
+    standard.wattsCPZoneArray[2] = cache->wattsCPZoneArray()[3];
 
     curveSelected->hide();
 }
@@ -1008,6 +1132,7 @@ PowerHist::setDataFromCompare()
         // the ride cache
         add.wattsArray.resize(0);
         add.wattsZoneArray.resize(10);
+        add.wattsCPZoneArray.resize(3);
         add.wattsKgArray.resize(0);
         add.aPowerArray.resize(0);
         add.nmArray.resize(0);
@@ -1038,6 +1163,13 @@ PowerHist::setDataFromCompare()
             add.wattsZoneArray[i] = s->wattsZoneArray()[i];
             add.hrZoneArray[i] = s->hrZoneArray()[i];
         }
+        // polarised zones
+        add.wattsCPZoneArray[0] = s->wattsCPZoneArray()[1];
+        if (withz) {
+            add.wattsCPZoneArray[0] += s->wattsCPZoneArray()[0]; // add in zero watts
+        }
+        add.wattsCPZoneArray[1] = s->wattsCPZoneArray()[2];
+        add.wattsCPZoneArray[2] = s->wattsCPZoneArray()[3];
 
         // add to the list
         compareData << add;
@@ -1361,6 +1493,7 @@ PowerHist::setData(RideItem *_rideItem, bool force)
 
         standard.wattsArray.resize(0);
         standard.wattsZoneArray.resize(0);
+        standard.wattsCPZoneArray.resize(0);
         standard.wattsKgArray.resize(0);
         standard.aPowerArray.resize(0);
         standard.nmArray.resize(0);
@@ -1383,6 +1516,12 @@ PowerHist::setData(RideItem *_rideItem, bool force)
         double torque_factor = (context->athlete->useMetricUnits ? 1.0 : 0.73756215);
         double speed_factor  = (context->athlete->useMetricUnits ? 1.0 : 0.62137119);
 
+        // cp and zones
+        int CP = 0;
+        const Zones *zones = rideItem->zones;
+        int zoneRange = zones ? zones->whichRange(ride->startTime().date()) : -1;
+        if (zoneRange != -1) CP=zones->getCP(zoneRange);
+    
         foreach(const RideFilePoint *p1, ride->dataPoints()) {
             bool selected = isSelected(p1, ride->recIntSecs());
 
@@ -1401,13 +1540,26 @@ PowerHist::setData(RideItem *_rideItem, bool force)
             }
 
             // watts zoned array
-            const Zones *zones = rideItem->zones;
-            int zoneRange = zones ? zones->whichRange(ride->startTime().date()) : -1;
 
             // Only calculate zones if we have a valid range and check zeroes
             if (zoneRange > -1 && (withz || (!withz && p1->watts))) {
+
+                // get the zone
                 wattsIndex = zones->whichZone(zoneRange, p1->watts);
 
+                // cp zoned
+                if (standard.wattsCPZoneArray.size() < 4) standard.wattsCPZoneArray.resize(3);
+                if (p1->watts < 1 && withz) // moderate zero watts
+                    standard.wattsCPZoneArray[0] += ride->recIntSecs();
+                else if (p1->watts >=1 && wattsIndex < 2) // moderate
+                    standard.wattsCPZoneArray[0] += ride->recIntSecs();
+                else if (p1->watts >=1 && p1->watts < CP) // heavy
+                    standard.wattsCPZoneArray[1] += ride->recIntSecs();
+                else if (p1->watts > CP) // severe
+                    standard.wattsCPZoneArray[2] += ride->recIntSecs();
+
+
+                // zoned
                 if (wattsIndex >= 0 && wattsIndex < maxSize) {
                     if (wattsIndex >= standard.wattsZoneArray.size())
                         standard.wattsZoneArray.resize(wattsIndex + 1);
@@ -1543,6 +1695,13 @@ PowerHist::setBinWidth(double value)
 {
     if (!value) value = 1; // binwidth must be nonzero
     binw = value;
+}
+
+void
+PowerHist::setCPZoned(bool value)
+{
+    cpzoned = value;
+    setComparePens();
 }
 
 void

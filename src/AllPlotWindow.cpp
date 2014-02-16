@@ -269,7 +269,7 @@ AllPlotWindow::AllPlotWindow(Context *context) :
     // TODO: zoomer doesn't interact well with automatic axis resizing
 
     // tooltip on hover over point
-    allPlot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtPlot::yLeft,
+    allPlot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtAxisId(QwtAxis::yLeft, 2).id,
                                QwtPicker::VLineRubberBand,
                                QwtPicker::AlwaysOn,
                                allPlot->canvas(),
@@ -283,6 +283,7 @@ AllPlotWindow::AllPlotWindow(Context *context) :
     allPlot->tooltip->setEnabled(true);
 
     allPlot->_canvasPicker = new LTMCanvasPicker(allPlot);
+    connect(context, SIGNAL(intervalHover(RideFileInterval)), allPlot, SLOT(intervalHover(RideFileInterval)));
     connect(allPlot->_canvasPicker, SIGNAL(pointHover(QwtPlotCurve*, int)), allPlot, SLOT(pointHover(QwtPlotCurve*, int)));
     connect(allPlot->tooltip, SIGNAL(moved(const QPoint &)), this, SLOT(plotPickerMoved(const QPoint &)));
     connect(allPlot->tooltip, SIGNAL(appended(const QPoint &)), this, SLOT(plotPickerSelected(const QPoint &)));
@@ -652,7 +653,7 @@ AllPlotWindow::compareChanged()
             if (!ci.isChecked()) ap->hide();
 
             // tooltip on hover over point -- consider moving this to AllPlot (!)
-            ap->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtPlot::yLeft,
+            ap->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtAxisId(QwtAxis::yLeft, 2).id,
                                     QwtPicker::VLineRubberBand,
                                     QwtPicker::AlwaysOn,
                                     ap->canvas(),
@@ -722,7 +723,7 @@ AllPlotWindow::compareChanged()
             plot->setFixedHeight(120+(stackWidth*3));
 
             // tooltip on hover over point -- consider moving this to AllPlot (!)
-            plot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtPlot::yLeft,
+            plot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtAxisId(QwtAxis::yLeft, 2).id,
                                     QwtPicker::VLineRubberBand,
                                     QwtPicker::AlwaysOn,
                                     plot->canvas(),
@@ -2370,7 +2371,7 @@ AllPlotWindow::setupSeriesStackPlots()
         _allPlot->setAxisTitle(QwtPlot::xBottom,NULL);
         _allPlot->setAxisMaxMinor(QwtPlot::xBottom, 0);
         _allPlot->setAxisMaxMinor(QwtPlot::yLeft, 0);
-        _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yLeft,2), 0);
+        _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yLeft,1), 0);
         _allPlot->setAxisMaxMinor(QwtPlot::yRight, 0);
         _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yRight,2).id, 0);
         _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yRight,3).id, 0);
@@ -2497,7 +2498,7 @@ AllPlotWindow::setupStackPlots()
         _allPlot->setAxisTitle(QwtPlot::xBottom,NULL);
         _allPlot->setAxisMaxMinor(QwtPlot::xBottom, 0);
         _allPlot->setAxisMaxMinor(QwtPlot::yLeft, 0);
-        _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yLeft,2), 0);
+        _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yLeft,1), 0);
         _allPlot->setAxisMaxMinor(QwtPlot::yRight, 0);
         _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yRight,2).id, 0);
         _allPlot->setAxisMaxMinor(QwtAxisId(QwtAxis::yRight,3).id, 0);
@@ -2562,7 +2563,7 @@ AllPlotWindow::addPickers(AllPlot *_allPlot)
     _allPlot->standard->allMarker2 = allMarker2;
 
     // use the tooltip picker rather than a standard picker
-    _allPlot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtPlot::yLeft,
+    _allPlot->tooltip = new LTMToolTip(QwtPlot::xBottom, QwtAxisId(QwtAxis::yLeft, 2).id,
                                QwtPicker::VLineRubberBand,
                                QwtPicker::AlwaysOn,
                                _allPlot->canvas(),
@@ -2576,6 +2577,7 @@ AllPlotWindow::addPickers(AllPlot *_allPlot)
     _allPlot->tooltip->setEnabled(true);
 
     _allPlot->_canvasPicker = new LTMCanvasPicker(_allPlot);
+    connect(context, SIGNAL(intervalHover(RideFileInterval)), _allPlot, SLOT(intervalHover(RideFileInterval)));
     connect(_allPlot->_canvasPicker, SIGNAL(pointHover(QwtPlotCurve*, int)), _allPlot, SLOT(pointHover(QwtPlotCurve*, int)));
     connect(_allPlot->tooltip, SIGNAL(moved(const QPoint &)), this, SLOT(plotPickerMoved(const QPoint &)));
     connect(_allPlot->tooltip, SIGNAL(appended(const QPoint &)), this, SLOT(plotPickerSelected(const QPoint &)));
