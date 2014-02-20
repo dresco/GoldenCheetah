@@ -429,7 +429,7 @@ int BudgetTrainer::openPort()
     int ldisc=N_TTY; // LINUX
 #endif
 
-    if ((devicePort=open(deviceFilename.toAscii(),O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) return errno;
+    if ((devicePort=open(deviceFilename.toLatin1(),O_RDWR | O_NOCTTY | O_NONBLOCK)) == -1) return errno;
 
     tcflush(devicePort, TCIOFLUSH); // clear out the garbage
 
@@ -482,7 +482,7 @@ int BudgetTrainer::openPort()
     else
        portSpec = "\\\\.\\" + deviceFilename;
     wchar_t deviceFilenameW[32]; // \\.\COM32 needs 9 characters, 32 should be enough?
-    MultiByteToWideChar(CP_ACP, 0, portSpec.toAscii(), -1, (LPWSTR)deviceFilenameW,
+    MultiByteToWideChar(CP_ACP, 0, portSpec.toLatin1(), -1, (LPWSTR)deviceFilenameW,
                     sizeof(deviceFilenameW));
 
     // win32 commport API
