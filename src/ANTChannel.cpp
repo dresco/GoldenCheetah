@@ -19,7 +19,6 @@
 
 #include "ANT.h"
 #include <QDebug>
-#include <QTime>
 
 static float timeout_blanking=2.0;  // time before reporting stale data, seconds
 static float timeout_drop=2.0; // time before reporting dropped message
@@ -59,7 +58,6 @@ ANTChannel::init()
     status = Closed;
     fecPrevRawDistance=0;
     fecCapabilities=0;
-    lastMessageTimestamp = lastMessageTimestamp2 = QTime::currentTime();
 }
 
 //
@@ -623,89 +621,104 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
            // Cadence
            case CHANNEL_TYPE_CADENCE:
            {
-               float rpm;
-               static float last_measured_rpm;
                uint16_t time = antMessage.crankMeasurementTime - lastMessage.crankMeasurementTime;
                uint16_t revs = antMessage.crankRevolutions - lastMessage.crankRevolutions;
                if (time) {
-                   rpm = 1024*60*revs / time;
-                   last_measured_rpm = rpm;
-                   lastMessageTimestamp = QTime::currentTime();
+                   nullCount = 0;
+                   float cadence = 1024*60*revs / time;
+                   parent->setCadence(cadence);
+                   value2 = value = cadence;
                } else {
-                   int ms = lastMessageTimestamp.msecsTo(QTime::currentTime());
-                   rpm = qMin((float)(1000.0*60.0*1.0) / ms, parent->getCadence());
-                   // If we received a message but timestamp remain unchanged then we know that sensor have not detected magnet thus we deduct that rpm cannot be higher than this
-                   if (rpm < last_measured_rpm / 2.0)
-                       rpm = 0.0; // if rpm is less than half previous cadence we consider that we are stopped
+                   nullCount++;
+                   if (nullCount >= RAMP_CADENCE_FINISH) {
+                       parent->setCadence(0);
+                       value = 0;
+                   } else if (nullCount >= RAMP_CADENCE_START) {
+                       float cadence = parent->getCadence() * RAMP_CONSTANT;
+                       parent->setCadence(cadence);
+                       value = cadence;
+                   }
                }
-               parent->setCadence(rpm);
-               value2 = value = rpm;
            }
            break;
 
            // Speed and Cadence
            case CHANNEL_TYPE_SandC:
            {
-               float rpm;
-               static float last_measured_rpm;
                // cadence first...
                uint16_t time = antMessage.crankMeasurementTime - lastMessage.crankMeasurementTime;
                uint16_t revs = antMessage.crankRevolutions - lastMessage.crankRevolutions;
                if (time) {
-                   rpm = 1024*60*revs / time;
-                   last_measured_rpm = rpm;
+                   nullCount = 0;
+                   float cadence = 1024*60*revs / time;
 
                    if (is_moxy) /* do nothing for now */ ; //XXX fixme when moxy arrives XXX
-                   else parent->setCadence(rpm);
-                   lastMessageTimestamp = QTime::currentTime();
+                   else parent->setCadence(cadence);
+                   value = cadence;
+
                } else {
-                   int ms = lastMessageTimestamp.msecsTo(QTime::currentTime());
-                   rpm = qMin((float)(1000.0*60.0*1.0) / ms, parent->getCadence());
-                   // If we received a message but timestamp remain unchanged then we know that sensor have not detected magnet thus we deduct that rpm cannot be higher than this
-                   if (rpm < last_measured_rpm / 2.0)
-                       rpm = 0.0; // if rpm is less than half previous cadence we consider that we are stopped
-                   parent->setCadence(rpm);
+                   nullCount++;
+                   if (!is_moxy) {
+                       if (nullCount >= RAMP_CADENCE_FINISH) {
+                           parent->setCadence(0);
+                           value = 0;
+                       } else if (nullCount >= RAMP_CADENCE_START) {
+                           float cadence = parent->getCadence() * RAMP_CONSTANT;
+                           parent->setCadence(cadence);
+                           value = cadence;
+                       }
+                   }
                }
-               value = rpm;
 
                // now speed ...
                time = antMessage.wheelMeasurementTime - lastMessage.wheelMeasurementTime;
                revs = antMessage.wheelRevolutions - lastMessage.wheelRevolutions;
                if (time) {
-                   rpm = 1024*60*revs / time;
+                   dualNullCount = 0;
+                   float rpm = 1024*60*revs / time;
+
                    if (is_moxy) /* do nothing for now */ ; //XXX fixme when moxy arrives XXX
                    else parent->setWheelRpm(rpm);
-                   lastMessageTimestamp2 = QTime::currentTime();
+                   value2 = rpm;
+
                } else {
-                   int ms = lastMessageTimestamp2.msecsTo(QTime::currentTime());
-                   rpm = qMin((float)(1000.0*60.0*1.0) / ms, parent->getWheelRpm());
-                   // If we received a message but timestamp remain unchanged then we know that sensor have not detected magnet thus we deduct that rpm cannot be higher than this
-                   if (rpm < (float) 15.0)
-                       rpm = 0.0; // if rpm is less than 15rpm (=4s) then we consider that we are stopped
-                   parent->setWheelRpm(rpm);
+                   dualNullCount++;
+                   if (!is_moxy) {
+                       if (dualNullCount >= RAMP_SPEED_FINISH) {
+                           parent->setWheelRpm(0);
+                           value2 = 0;
+                       } else if (dualNullCount >= RAMP_SPEED_START) {
+                           float rpm = parent->getWheelRpm() * RAMP_CONSTANT;
+                           parent->setWheelRpm(rpm);
+                           value2 = rpm;
+                       }
+                   }
                }
-               value2 = rpm;
            }
            break;
 
            // Speed
            case CHANNEL_TYPE_SPEED:
            {
-               float rpm;
                uint16_t time = antMessage.wheelMeasurementTime - lastMessage.wheelMeasurementTime;
                uint16_t revs = antMessage.wheelRevolutions - lastMessage.wheelRevolutions;
                if (time) {
-                   rpm = 1024*60*revs / time;
-                   lastMessageTimestamp = QTime::currentTime();
+                   nullCount=0;
+                   float rpm = 1024*60*revs / time;
+                   parent->setWheelRpm(rpm);
+                   value2=value=rpm;
+
                } else {
-                   int ms = lastMessageTimestamp.msecsTo(QTime::currentTime());
-                   rpm = qMin((float)(1000.0*60.0*1.0) / ms, parent->getWheelRpm());
-                   // If we received a message but timestamp remain unchanged then we know that sensor have not detected magnet thus we deduct that rpm cannot be higher than this
-                   if (rpm < (float) 15.0)
-                       rpm = 0.0; // if rpm is less than 15 (4s) then we consider that we are stopped
+                   nullCount++;
+                   if (nullCount >= RAMP_SPEED_FINISH) {
+                       parent->setWheelRpm(0);
+                       value2 = value = 0;
+                   } else if (nullCount >= RAMP_SPEED_START) {
+                       float rpm = parent->getWheelRpm() * RAMP_CONSTANT;
+                       parent->setWheelRpm(rpm);
+                       value2 = value = rpm;
+                   }
                }
-               parent->setWheelRpm(rpm);
-               value2=value=rpm;
            }
            break;
 

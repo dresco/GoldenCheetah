@@ -23,8 +23,6 @@
 #include "ANT.h"
 #include "ANTMessage.h"
 #include <QObject>
-#include <QTime>
-#include <QTimer>
 
 #define CHANNEL_TYPE_QUICK_SEARCH 0x10 // or'ed with current channel type
 /* after fast search, wait for slow search.  Otherwise, starting slow
@@ -34,6 +32,13 @@
 #define CHANNEL_TYPE_TX 0x10
 #define CHANNEL_TYPE_PAIR   0x40 // to do an Ant pair
 #define MESSAGE_RECEIVED -1
+
+// ramp down speed and cadence instead of stopping abruptly after 3 seconds
+#define RAMP_CADENCE_START   8
+#define RAMP_CADENCE_FINISH  12
+#define RAMP_SPEED_START     6
+#define RAMP_SPEED_FINISH    12
+#define RAMP_CONSTANT        0.67
 
 // note: this struct is from quarqd_dist/quarqd/src/generated-headers.h
 class ANTChannelInitialisation {
@@ -104,8 +109,6 @@ class ANTChannel : public QObject {
 
         int   messages_received; // for signal strength metric
         int   messages_dropped;
-        QTime lastMessageTimestamp;
-        QTime lastMessageTimestamp2;
 
         unsigned char rx_burst_data[RX_BURST_DATA_LEN];
         int           rx_burst_data_index;
