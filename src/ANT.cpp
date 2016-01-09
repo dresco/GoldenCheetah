@@ -1296,3 +1296,16 @@ qint64 ANT::getElapsedTime()
 {
     return elapsedTimer.elapsed();
 }
+
+// look for Tacx FE-C channel with same device number
+// - used to temporarily blacklist Tacx trainer S&C channel
+int ANT::isAlsoTacxFEC(int device_number)
+{
+    for (int i=0; i<channels; i++) {
+        if ((antChannel[i]->device_number == device_number) &&
+            (antChannel[i]->device_id == ANT_SPORT_FITNESS_EQUIPMENT_TYPE) &&
+            (antChannel[i]->manufacturer_id == 0x59))
+            return 1;
+    }
+    return 0;
+}

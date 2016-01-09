@@ -97,6 +97,7 @@ class ANTChannel : public QObject {
         uint8_t fecPrevRawDistance;
         uint8_t  fecCapabilities;
 
+        int blacklisted;
         double blanking_timestamp;
         int blanked;
         char id[10]; // short identifier
@@ -114,7 +115,6 @@ class ANTChannel : public QObject {
         void (*tx_ack_disposition)(struct ant_channel *);
 
         // what we got
-        int manufacturer_id;
         int product_id;
         int product_version;
 
@@ -152,6 +152,7 @@ class ANTChannel : public QObject {
         int device_number;
         int channel_type_flags;
         int device_id;
+        int manufacturer_id;
 
         // special cases
         bool is_kickr;

@@ -466,6 +466,7 @@ public:
     int removeDevice(int device_number, int channel_type);
     ANTChannel *findDevice(int device_number, int channel_type);
     int startWaitingSearch();
+    int isAlsoTacxFEC(int device_number);
 
     // transmission
     void sendMessage(ANTMessage);
