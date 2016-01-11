@@ -1297,15 +1297,21 @@ qint64 ANT::getElapsedTime()
     return elapsedTimer.elapsed();
 }
 
-// look for Tacx FE-C channel with same device number
-// - used to temporarily blacklist Tacx trainer S&C channel
-int ANT::isAlsoTacxFEC(int device_number)
+// blacklist a specific sensor
+void ANT::blacklistSensor(int device_number, int device_id)
 {
-    for (int i=0; i<channels; i++) {
-        if ((antChannel[i]->device_number == device_number) &&
-            (antChannel[i]->device_id == ANT_SPORT_FITNESS_EQUIPMENT_TYPE) &&
-            (antChannel[i]->manufacturer_id == 0x59))
-            return 1;
+    char *name = NULL;
+
+    for (int i=0; ant_sensor_types[i].suffix !=  '\0'; i++) {
+        if (ant_sensor_types[i].device_id == device_id)
+            name = (char*)ant_sensor_types[i].descriptive_name;
     }
-    return 0;
+
+    for (int i=0; i<channels; i++) {
+        if ((antChannel[i]->device_number == device_number) && (antChannel[i]->device_id == device_id)) {
+            antChannel[i]->blacklisted = 1;
+            if (name)
+                qDebug() << "*** Blacklisting" << name << "sensor id" << device_number;
+        }
+    }
 }

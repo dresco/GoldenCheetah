@@ -344,6 +344,12 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
         product_id=MANUFACTURER_MODEL_NUMBER_ID(message);
         checkCinqo();
 
+        // If we are a Tacx FE-C trainer then blacklist the Speed and Cadence channel
+        // on the same device, as known to cause problems due to poor quality data
+        // (multiple unchanged messages between valid updates)
+        if (is_fec && manufacturer_id == 0x59)
+            parent->blacklistSensor(device_number, ANT_SPORT_SandC_TYPE);
+
     }
     else {
         telemetry = true;
@@ -649,7 +655,6 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
            {
                float rpm;
                static float last_measured_rpm;
-               static int refresh_counter=1;
 
                if (!blacklisted) {
                    // cadence first...
@@ -691,17 +696,6 @@ void ANTChannel::broadcastEvent(unsigned char *ant_message)
                        parent->setWheelRpm(rpm);
                    }
                    value2 = rpm;
-               }
-
-               // do at end of message processing to avoid timing jitter, check every 15s
-               if (!blacklisted) {
-                   if ((refresh_counter++ % 60) == 0) {
-                       int is_tacxfec = parent->isAlsoTacxFEC(device_number);
-                       if (is_tacxfec) {
-                           qDebug() << number << "Tacx S&C sensor detected - blacklisting..";
-                           blacklisted = 1;
-                       }
-                   }
                }
            }
            break;
