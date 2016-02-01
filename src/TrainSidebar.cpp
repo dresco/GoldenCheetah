@@ -467,6 +467,9 @@ intensity->hide(); //XXX!!! temporary
     // Remote control support
     remote = new RemoteControl;
 
+    // Trainer Offset adjustments
+    offset = new TrainerOffset;
+
     // now the GUI is setup lets sort our control variables
     gui_timer = new QTimer(this);
     disk_timer = new QTimer(this);
@@ -491,7 +494,7 @@ intensity->hide(); //XXX!!! temporary
     wbalr = wbal = 0;
     load_msecs = total_msecs = lap_msecs = 0;
     displayWorkoutDistance = displayDistance = displayPower = displayHeartRate =
-    displaySpeed = displayCadence = slope = load = 0;
+    displaySpeed = displayCadence = slope = displayLoad = adjustedLoad = 0;
     displayLRBalance = displayLTE = displayRTE = displayLPS = displayRPS = 0;
 
     connect(gui_timer, SIGNAL(timeout()), this, SLOT(guiUpdate()));
@@ -777,6 +780,9 @@ TrainSidebar::configChanged(qint32)
 
     // Re-read ANT remote control command mappings
     remote->readConfig();
+
+    // Re-read Trainer Offset parameters
+    offset->readConfig();
 
     // Athlete
     FTP=285; // default to 285 if zones are not set
@@ -1156,7 +1162,7 @@ void TrainSidebar::Start()       // when start button is pressed
         //gui_timer->start(REFRESHRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         load_period.restart();
-        if (status & RT_WORKOUT) load_timer->start(LOADRATE);
+        //if (status & RT_WORKOUT) load_timer->start(LOADRATE);
 
 #if !defined GC_VIDEO_NONE
         mediaTree->setEnabled(false);
@@ -1179,7 +1185,7 @@ void TrainSidebar::Start()       // when start button is pressed
         //foreach(int dev, activeDevices) Devices[dev].controller->pause();
         //gui_timer->stop();
         if (status & RT_RECORDING) disk_timer->stop();
-        if (status & RT_WORKOUT) load_timer->stop();
+        //if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
 
 #if !defined GC_VIDEO_NONE
@@ -1208,7 +1214,7 @@ void TrainSidebar::Start()       // when start button is pressed
         // START!
         play->setIcon(pauseIcon);
 
-        load = 100;
+        displayLoad = 100;
         slope = 0.0;
 
         if (mode == ERG || mode == MRC) {
@@ -1236,9 +1242,9 @@ void TrainSidebar::Start()       // when start button is pressed
         wbal = WPRIME;
         calibrating = false;
 
-        if (status & RT_WORKOUT) {
-            load_timer->start(LOADRATE);      // start recording
-        }
+        //if (status & RT_WORKOUT) {
+        //    load_timer->start(LOADRATE);      // start recording
+        //}
 
         if (recordSelector->isChecked()) {
             setStatusFlags(RT_RECORDING);
@@ -1288,7 +1294,7 @@ void TrainSidebar::Pause()        // pause capture to recalibrate
         gui_timer->start(REFRESHRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         load_period.restart();
-        if (status & RT_WORKOUT) load_timer->start(LOADRATE);
+        //if (status & RT_WORKOUT) load_timer->start(LOADRATE);
 
 #if !defined GC_VIDEO_NONE
         mediaTree->setEnabled(false);
@@ -1306,7 +1312,7 @@ void TrainSidebar::Pause()        // pause capture to recalibrate
         setStatusFlags(RT_PAUSED);
         gui_timer->stop();
         if (status & RT_RECORDING) disk_timer->stop();
-        if (status & RT_WORKOUT) load_timer->stop();
+        //if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
 
         // enable media tree so we can change movie
@@ -1337,7 +1343,7 @@ void TrainSidebar::Stop(int deviceStatus)        // when stop button is pressed
 
     calibrating = false;
 
-    load = 0;
+    displayLoad = 0;
     slope = 0.0;
 
     QDateTime now = QDateTime::currentDateTime();
@@ -1365,10 +1371,9 @@ void TrainSidebar::Stop(int deviceStatus)        // when stop button is pressed
         }
     }
 
-    if (status & RT_WORKOUT) {
-        load_timer->stop();
-        load_msecs = 0;
-    }
+    //if (status & RT_WORKOUT) {
+    //    load_timer->stop();
+    //}
 
     // get back to normal after it may have been adusted by the user
     lastAppliedIntensity=100;
@@ -1398,6 +1403,7 @@ void TrainSidebar::Stop(int deviceStatus)        // when stop button is pressed
     lap_elapsed_msec = 0;
     lap_time.restart();
     displayWorkoutDistance = displayDistance = 0;
+    load_msecs = 0;
     guiUpdate();
 
     return;
@@ -1411,7 +1417,7 @@ void TrainSidebar::updateData(RealtimeData &rtData)
     displayCadence = rtData.getCadence();
     displayHeartRate = rtData.getHr();
     displaySpeed = rtData.getSpeed();
-    load = rtData.getLoad();
+    displayLoad = rtData.getLoad();
     displayLRBalance = rtData.getLRBalance();
     displayLTE = rtData.getLTE();
     displayRTE = rtData.getRTE();
@@ -1464,6 +1470,7 @@ void TrainSidebar::Connect()
     setStatusFlags(RT_CONNECTED);
     cnct->setIcon(connectedIcon);
     gui_timer->start(REFRESHRATE);
+    load_timer->start(LOADRATE);
 }
 
 void TrainSidebar::Disconnect()
@@ -1481,6 +1488,7 @@ void TrainSidebar::Disconnect()
 
     cnct->setIcon(disconnectedIcon);
     gui_timer->stop();
+    load_timer->stop();
 }
 
 //----------------------------------------------------------------------
@@ -1513,8 +1521,8 @@ void TrainSidebar::guiUpdate()           // refreshes the telemetry
             // and exit.  Nothing else to do until we finish calibrating
             return;
         } else {
-            rtData.setLoad(load); // always set load..
-            rtData.setSlope(slope); // always set load..
+            rtData.setLoad(displayLoad); // always set load..
+            rtData.setSlope(slope); // always set slope..
 
             // fetch the right data from each device...
             foreach(int dev, activeDevices) {
@@ -1609,7 +1617,7 @@ void TrainSidebar::guiUpdate()           // refreshes the telemetry
             displayCadence = rtData.getCadence();
             displayHeartRate = rtData.getHr();
             displaySpeed = rtData.getSpeed();
-            load = rtData.getLoad();
+            displayLoad = rtData.getLoad();
             slope = rtData.getSlope();
             displayLRBalance = rtData.getLRBalance();
             displayLTE = rtData.getLTE();
@@ -1766,46 +1774,69 @@ void TrainSidebar::loadUpdate()
 {
     int curLap;
 
+    double error, proportionalTerm, integralTerm, derivativeTerm, adjustment, adjustedLoad;
+
     // we hold our horses whilst calibration is taking place...
+    // fixme:??
     if (calibrating) return;
 
     // the period between loadUpdate calls is not constant, and not exactly LOADRATE,
     // therefore, use a QTime timer to measure the load period
-    load_msecs += load_period.restart();
+    if ((status&RT_RUNNING) && ((status&RT_PAUSED) == 0)) {
+        load_msecs += load_period.restart();
+    }
 
-    if (status&RT_MODE_ERGO) {
-        load = ergFile->wattsAt(load_msecs, curLap);
+    // Adjust trainer load if required
+    adjustedLoad = offset->adjustLoad(displayLoad, displayPower);
+    offset->getStatistics(&error, &adjustment, &adjustedLoad, &proportionalTerm, &integralTerm, &derivativeTerm);
+    qDebug() << "AdjL:" << adjustedLoad << "Err:" << error << "Adj:" << adjustment <<
+                "P:" << proportionalTerm << "I:" << integralTerm << "D:" << derivativeTerm;
 
-        if(displayWorkoutLap != curLap)
-        {
-            context->notifyNewLap();
-        }
-        displayWorkoutLap = curLap;
+    if (status&RT_WORKOUT) {
+        // workout file loaded
+        // todo: perhaps not set load unless started?
+        if (status&RT_MODE_ERGO) {
+            displayLoad = ergFile->wattsAt(load_msecs, curLap);
 
-        // we got to the end!
-        if (load == -100) {
-            Stop(DEVICE_OK);
+            if(displayWorkoutLap != curLap)
+            {
+                context->notifyNewLap();
+            }
+            displayWorkoutLap = curLap;
+
+            // we got to the end!
+            if (displayLoad == -100) {
+                Stop(DEVICE_OK);
+            } else {
+                foreach(int dev, activeDevices) Devices[dev].controller->setLoad(adjustedLoad);
+                context->notifySetNow(load_msecs);
+            }
         } else {
-            foreach(int dev, activeDevices) Devices[dev].controller->setLoad(load);
-            context->notifySetNow(load_msecs);
+            slope = ergFile->gradientAt(displayWorkoutDistance*1000, curLap);
+
+            if(displayWorkoutLap != curLap)
+            {
+                context->notifyNewLap();
+            }
+            displayWorkoutLap = curLap;
+
+            // we got to the end!
+            if (slope == -100) {
+                Stop(DEVICE_OK);
+            } else {
+                foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
+                context->notifySetNow(displayWorkoutDistance * 1000);
+            }
         }
     } else {
-        slope = ergFile->gradientAt(displayWorkoutDistance*1000, curLap);
-
-        if(displayWorkoutLap != curLap)
-        {
-            context->notifyNewLap();
-        }
-        displayWorkoutLap = curLap;
-
-        // we got to the end!
-        if (slope == -100) {
-            Stop(DEVICE_OK);
+        // manual erg/slope mode
+        if (status&RT_MODE_ERGO) {
+            foreach(int dev, activeDevices) Devices[dev].controller->setLoad(adjustedLoad);
         } else {
             foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
-            context->notifySetNow(displayWorkoutDistance * 1000);
         }
     }
+    //qDebug() << "TrainSidebar::LoadUpdate()" << load_msecs;
 }
 
 void TrainSidebar::Calibrate()
@@ -1820,7 +1851,7 @@ void TrainSidebar::Calibrate()
         session_time.start();
         lap_time.start();
         load_period.restart();
-        if (status & RT_WORKOUT) load_timer->start(LOADRATE);
+        //if (status & RT_WORKOUT) load_timer->start(LOADRATE);
         if (status & RT_RECORDING) disk_timer->start(SAMPLERATE);
         context->notifyUnPause(); // get video started again, amongst other things
 
@@ -1829,13 +1860,13 @@ void TrainSidebar::Calibrate()
 
             foreach(int dev, activeDevices) {
                 Devices[dev].controller->setMode(RT_MODE_ERGO);
-                Devices[dev].controller->setLoad(load);
+                //Devices[dev].controller->setLoad(displayLoad);
             }
         } else {
 
             foreach(int dev, activeDevices) {
                 Devices[dev].controller->setMode(RT_MODE_SPIN);
-                Devices[dev].controller->setGradient(slope);
+                //Devices[dev].controller->setGradient(slope);
             }
         }
 
@@ -1857,7 +1888,7 @@ void TrainSidebar::Calibrate()
         lap_elapsed_msec += lap_time.elapsed();
 
         if (status & RT_RECORDING) disk_timer->stop();
-        if (status & RT_WORKOUT) load_timer->stop();
+        //if (status & RT_WORKOUT) load_timer->stop();
         load_msecs += load_period.restart();
 
         context->notifyPause(); // get video started again, amongst other things
@@ -1932,16 +1963,17 @@ void TrainSidebar::Higher()
         intensitySlider->setValue(intensitySlider->value()+5);
 
     } else {
-        if (status&RT_MODE_ERGO) load += 5;
+        if (status&RT_MODE_ERGO) displayLoad += 5;
         else slope += 0.1;
 
-        if (load >1500) load = 1500;
+        if (displayLoad >1500) displayLoad = 1500;
         if (slope >15) slope = 15;
 
-        if (status&RT_MODE_ERGO)
-            foreach(int dev, activeDevices) Devices[dev].controller->setLoad(load);
-        else
-            foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
+        // let loadUpdate() handle setting the trainer
+        //if (status&RT_MODE_ERGO)
+        //    foreach(int dev, activeDevices) Devices[dev].controller->setLoad(displayLoad);
+        //else
+        //    foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
     }
 }
 
@@ -1956,16 +1988,17 @@ void TrainSidebar::Lower()
 
     } else {
 
-        if (status&RT_MODE_ERGO) load -= 5;
+        if (status&RT_MODE_ERGO) displayLoad -= 5;
         else slope -= 0.1;
 
-        if (load <0) load = 0;
+        if (displayLoad <0) displayLoad = 0;
         if (slope <-10) slope = -10;
 
-        if (status&RT_MODE_ERGO)
-            foreach(int dev, activeDevices) Devices[dev].controller->setLoad(load);
-        else
-            foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
+        // let loadUpdate() handle setting the trainer
+        //if (status&RT_MODE_ERGO)
+        //    foreach(int dev, activeDevices) Devices[dev].controller->setLoad(displayLoad);
+        //else
+        //    foreach(int dev, activeDevices) Devices[dev].controller->setGradient(slope);
     }
 }
 

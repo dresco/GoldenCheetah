@@ -283,6 +283,10 @@ ANT::setLoad(double load)
 {
     if (this->load == load) return;
 
+    // bound the load as we do for other trainers..
+    if (load > 1500) load = 1500;
+    if (load < 50) load = 50;
+
     // load has changed
     this->load = load;
 
@@ -631,8 +635,12 @@ ANT::addDevice(int device_number, int device_type, int channel_number)
 
                 // if we are not the first power channel then set to update
                 // the alternate power channel
-                if (powerchannels)
+                if (powerchannels) {
                     antChannel[i]->setAlt(true);
+                    qDebug() << "*** Alternate power channel:" << antChannel[i]->device_number;
+                } else {
+                    qDebug() << "*** Primary power channel:" << antChannel[i]->device_number;
+                }
 
                 // increment the number of power channels
                 powerchannels++;

@@ -30,6 +30,7 @@
 #include "ErgFilePlot.h"
 #include "GcSideBarItem.h"
 #include "RemoteControl.h"
+#include "TrainerOffset.h"
 #include "Tab.h"
 
 // standard stuff
@@ -64,7 +65,7 @@
 #define REFRESHRATE    200 // screen refresh in milliseconds
 #define STREAMRATE     200 // rate at which we stream updates to remote peer
 #define SAMPLERATE     1000 // disk update in milliseconds
-#define LOADRATE       1000 // rate at which load is adjusted
+#define LOADRATE       250 // rate at which load is adjusted
 
 // device treeview node types
 #define HEAD_TYPE    6666
@@ -125,6 +126,7 @@ class TrainSidebar : public GcWindow
         int kphTelemetry;   // Speed (and Distance)
 
         RemoteControl *remote;      // remote control settings
+        TrainerOffset *offset;      // trainer load adjustments
 
     signals:
 
@@ -245,7 +247,7 @@ class TrainSidebar : public GcWindow
         double displayPower, displayHeartRate, displayCadence, displaySpeed;
         double displayLRBalance, displayLTE, displayRTE, displayLPS, displayRPS;
         double displayDistance, displayWorkoutDistance;
-        long load;
+        long displayLoad, adjustedLoad;
         double slope;
         int displayLap;            // user increment for Lap
         int displayWorkoutLap;     // which Lap in the workout are we at?
