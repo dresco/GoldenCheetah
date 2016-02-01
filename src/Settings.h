@@ -184,6 +184,13 @@
 #define GC_REMOTE_HIGHER                "<global-trainmode>remote/higher"
 #define GC_REMOTE_LOWER                 "<global-trainmode>remote/lower"
 #define GC_REMOTE_CALIBRATE             "<global-trainmode>remote/calibrate"
+#define GC_OFFSET_TYPE                  "<global-trainmode>offset/type"
+#define GC_OFFSET_MANUAL_PERCENT        "<global-trainmode>offset/percent"
+#define GC_OFFSET_MANUAL_WATTAGE        "<global-trainmode>offset/watts"
+#define GC_OFFSET_AUTO_SMOOTHING        "<global-trainmode>offset/smoothing"
+#define GC_OFFSET_AUTO_PROPORTIONAL     "<global-trainmode>offset/proportionalConstant"
+#define GC_OFFSET_AUTO_INTEGRAL         "<global-trainmode>offset/integralConstant"
+#define GC_OFFSET_AUTO_DERIVATIVE       "<global-trainmode>offset/derivativeConstant"
 
 // --------------------------------------------------------------------------------
 // Athlete Specific Properties - Stored in /config subfolder of the related athlete

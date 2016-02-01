@@ -1824,6 +1824,162 @@ RemotePage::saveClicked()
     return 0;
 }
 
+//
+// Trainer Offset page
+//
+TrainerOffsetPage::TrainerOffsetPage(QWidget *parent, Context *context) : QWidget(parent), context(context)
+{
+    offset = new TrainerOffset;
+
+    QVBoxLayout *all = new QVBoxLayout(this);
+    QGridLayout *grid = new QGridLayout;
+
+    grid->setContentsMargins(15,15,15,15);
+    grid->setVerticalSpacing(10);
+    grid->setColumnStretch(0,2);
+    grid->setColumnStretch(1,3);
+
+    all->addLayout(grid);
+    all->addStretch();
+
+    QLabel *typeLabel = new QLabel(tr("Adjustment type:"));
+    type = new QComboBox();
+    type->addItem(tr("None"));
+    type->addItem(tr("Manual"));
+    type->addItem(tr("Automatic"));
+    type->setCurrentIndex(offset->config.type);
+
+    QFrame *line1 = new QFrame(this);
+    line1->setLineWidth(2);
+    line1->setMidLineWidth(1);
+    line1->setFrameShape(QFrame::HLine);
+    line1->setFrameShadow(QFrame::Raised);
+
+    QFrame *line2 = new QFrame(this);
+    line2->setLineWidth(2);
+    line2->setMidLineWidth(1);
+    line2->setFrameShape(QFrame::HLine);
+    line2->setFrameShadow(QFrame::Raised);
+
+    QLabel *manualLabel  = new QLabel(tr("Manual Adjustment:"));
+    QLabel *percentLabel = new QLabel(tr("Percent"));
+    QLabel *wattsLabel   = new QLabel(tr("Watts"));
+
+    percent = new QSpinBox(this);
+    percent->setMaximum(125);
+    percent->setMinimum(75);
+    percent->setValue(offset->config.percent);
+
+    watts = new QSpinBox(this);
+    watts->setMinimum(-50);
+    watts->setMaximum(50);
+    watts->setValue(offset->config.watts);
+
+    QLabel *autoLabel  = new QLabel(tr("Automatic Adjustment:"));
+    QLabel *smoothingLabel = new QLabel(tr("Smoothing"));
+    QLabel *proportionalLabel = new QLabel(tr("Proportional constant"));
+    QLabel *integralLabel = new QLabel(tr("Integral constant"));
+    QLabel *derivativeLabel = new QLabel(tr("Derivative constant"));
+
+    smoothing = new QSpinBox(this);
+    smoothing->setMaximum(10);
+    smoothing->setMinimum(1);
+    smoothing->setValue(offset->config.smoothing);
+
+    smoothing->setEnabled(false);
+    smoothingLabel->setEnabled(false);
+
+    proportional = new QDoubleSpinBox(this);
+    proportional->setMaximum(1.0);
+    proportional->setMinimum(0.0);
+    proportional->setDecimals(2);
+    proportional->setSingleStep(0.01);
+    proportional->setValue(offset->config.proportionalConstant);
+
+    integral = new QDoubleSpinBox(this);
+    integral->setMaximum(1.0);
+    integral->setMinimum(0.0);
+    integral->setDecimals(2);
+    integral->setSingleStep(0.01);
+    integral->setValue(offset->config.integralConstant);
+
+    derivative = new QDoubleSpinBox(this);
+    derivative->setMaximum(1.0);
+    derivative->setMinimum(0.0);
+    derivative->setDecimals(2);
+    derivative->setSingleStep(0.01);
+    derivative->setValue(offset->config.derivativeConstant);
+
+    QHBoxLayout *percentLayout = new QHBoxLayout();
+    percentLayout->setSpacing(10);
+    percentLayout->addWidget(percent);
+    percentLayout->addWidget(percentLabel);
+
+    QHBoxLayout *wattsLayout = new QHBoxLayout();
+    wattsLayout->setSpacing(10);
+    wattsLayout->addWidget(watts);
+    wattsLayout->addWidget(wattsLabel);
+
+    QHBoxLayout *smoothingLayout = new QHBoxLayout();
+    smoothingLayout->setSpacing(10);
+    smoothingLayout->addWidget(smoothing);
+    smoothingLayout->addWidget(smoothingLabel);
+
+    QHBoxLayout *proportionalLayout = new QHBoxLayout();
+    proportionalLayout->setSpacing(10);
+    proportionalLayout->addWidget(proportional);
+    proportionalLayout->addWidget(proportionalLabel);
+
+    QHBoxLayout *integralLayout = new QHBoxLayout();
+    integralLayout->setSpacing(10);
+    integralLayout->addWidget(integral);
+    integralLayout->addWidget(integralLabel);
+
+    QHBoxLayout *derivativeLayout = new QHBoxLayout();
+    derivativeLayout->setSpacing(10);
+    derivativeLayout->addWidget(derivative);
+    derivativeLayout->addWidget(derivativeLabel);
+
+    grid->addWidget(typeLabel, 0,0, Qt::AlignLeft|Qt::AlignVCenter);
+    grid->addWidget(type, 0,1, Qt::AlignLeft|Qt::AlignVCenter);
+
+    grid->addWidget(line1, 1,0,1,2, Qt::AlignVCenter);
+    grid->setRowMinimumHeight(1, 25);
+
+    grid->addWidget(manualLabel, 2,0, Qt::AlignLeft|Qt::AlignVCenter);
+
+    grid->addLayout(percentLayout, 2,1, Qt::AlignLeft|Qt::AlignVCenter);
+    grid->addLayout(wattsLayout, 3,1, Qt::AlignLeft|Qt::AlignVCenter);
+
+    grid->addWidget(line2, 4,0,1,2, Qt::AlignVCenter);
+    grid->setRowMinimumHeight(3, 25);
+
+    grid->addWidget(autoLabel, 5,0, Qt::AlignLeft|Qt::AlignVCenter);
+
+    grid->addLayout(smoothingLayout, 5,1, Qt::AlignLeft|Qt::AlignVCenter);
+    grid->addLayout(proportionalLayout, 6,1, Qt::AlignLeft|Qt::AlignVCenter);
+    grid->addLayout(integralLayout, 7,1, Qt::AlignLeft|Qt::AlignVCenter);
+    grid->addLayout(derivativeLayout, 8,1, Qt::AlignLeft|Qt::AlignVCenter);
+
+}
+
+qint32
+TrainerOffsetPage::saveClicked()
+{
+    qDebug() << "TrainerOffsetPage::saveClicked()";
+
+    offset->config.type = type->currentIndex();
+    offset->config.percent = percent->value();
+    offset->config.watts = watts->value();
+    offset->config.smoothing = smoothing->value();
+    offset->config.proportionalConstant = proportional->value();
+    offset->config.integralConstant = integral->value();
+    offset->config.derivativeConstant = derivative->value();
+    offset->writeConfig();
+
+    return 0;
+}
+
 static void setSizes(QComboBox *p)
 {
 #ifdef Q_OS_MAC

@@ -51,6 +51,7 @@
 #include "SeasonParser.h"
 #include "RideAutoImportConfig.h"
 #include "RemoteControl.h"
+#include "TrainerOffset.h"
 
 class QGroupBox;
 class QHBoxLayout;
@@ -371,6 +372,23 @@ class RemotePage : public QWidget
         RemoteControl *remote;
         Context       *context;
         QTreeWidget   *fields;
+};
+
+class TrainerOffsetPage : public QWidget
+{
+    Q_OBJECT
+    G_OBJECT
+
+    public:
+        TrainerOffsetPage(QWidget *parent, Context *context);
+        qint32 saveClicked();
+
+    private:
+        TrainerOffset  *offset;
+        Context        *context;
+        QComboBox      *type;
+        QSpinBox       *percent, *watts, *smoothing;
+        QDoubleSpinBox *proportional, *integral, *derivative;
 };
 
 class BestsMetricsPage : public QWidget

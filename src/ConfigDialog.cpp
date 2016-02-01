@@ -471,6 +471,7 @@ TrainConfig::TrainConfig(QDir home, Context *context) :
     // the widgets
     devicePage = new DevicePage(this, context);
     remotePage = new RemotePage(this, context);
+    offsetPage = new TrainerOffsetPage(this, context);
 
     setContentsMargins(0,0,0,0);
     QHBoxLayout *mainLayout = new QHBoxLayout(this);
@@ -480,6 +481,7 @@ TrainConfig::TrainConfig(QDir home, Context *context) :
     QTabWidget *tabs = new QTabWidget(this);
     tabs->addTab(devicePage, tr("Train Devices"));
     tabs->addTab(remotePage, tr("Remote Controls"));
+    tabs->addTab(offsetPage, tr("Trainer Offset"));
 
     mainLayout->addWidget(tabs);
 }
@@ -490,6 +492,7 @@ qint32 TrainConfig::saveClicked()
 
     state |= devicePage->saveClicked();
     state |= remotePage->saveClicked();
+    state |= offsetPage->saveClicked();
 
     return state;
 }

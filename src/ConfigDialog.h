@@ -169,6 +169,7 @@ class TrainConfig : public QWidget
 
         DevicePage *devicePage;
         RemotePage *remotePage;
+        TrainerOffsetPage *offsetPage;
 };
 
 // INTERVAL PAGE
