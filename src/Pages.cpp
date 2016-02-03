@@ -1876,18 +1876,20 @@ TrainerOffsetPage::TrainerOffsetPage(QWidget *parent, Context *context) : QWidge
     watts->setValue(offset->config.watts);
 
     QLabel *autoLabel  = new QLabel(tr("Automatic Adjustment:"));
-    QLabel *smoothingLabel = new QLabel(tr("Smoothing"));
+    QLabel *smoothingLabel = new QLabel(tr("Smoothing constant"));
     QLabel *proportionalLabel = new QLabel(tr("Proportional constant"));
     QLabel *integralLabel = new QLabel(tr("Integral constant"));
     QLabel *derivativeLabel = new QLabel(tr("Derivative constant"));
 
-    smoothing = new QSpinBox(this);
-    smoothing->setMaximum(10);
-    smoothing->setMinimum(1);
+    smoothing = new QDoubleSpinBox(this);
+    smoothing->setMaximum(1);
+    smoothing->setMinimum(0);
+    smoothing->setDecimals(2);
+    smoothing->setSingleStep(0.01);
     smoothing->setValue(offset->config.smoothing);
 
-    smoothing->setEnabled(false);
-    smoothingLabel->setEnabled(false);
+    //smoothing->setEnabled(false);
+    //smoothingLabel->setEnabled(false);
 
     proportional = new QDoubleSpinBox(this);
     proportional->setMaximum(1.0);

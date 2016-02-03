@@ -29,7 +29,7 @@ typedef struct {
     uint8_t         type;
     uint8_t         percent;
     int8_t          watts;
-    uint8_t         smoothing;
+    double          smoothing;
     double          proportionalConstant;
     uint8_t         proportionalLimit;
     double          integralConstant;

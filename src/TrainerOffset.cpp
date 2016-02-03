@@ -46,7 +46,7 @@ TrainerOffset::readConfig()
     config.type                 = appsettings->value(NULL, GC_OFFSET_TYPE, 0).toUInt();
     config.percent              = appsettings->value(NULL, GC_OFFSET_MANUAL_PERCENT, 0).toUInt();
     config.watts                = appsettings->value(NULL, GC_OFFSET_MANUAL_WATTAGE, 0).toInt();
-    config.smoothing            = appsettings->value(NULL, GC_OFFSET_AUTO_SMOOTHING, 1).toUInt();
+    config.smoothing            = appsettings->value(NULL, GC_OFFSET_AUTO_SMOOTHING, 1).toDouble();
     config.proportionalConstant = appsettings->value(NULL, GC_OFFSET_AUTO_PROPORTIONAL, 0).toDouble();
     config.integralConstant     = appsettings->value(NULL, GC_OFFSET_AUTO_INTEGRAL, 0).toDouble();
     config.derivativeConstant   = appsettings->value(NULL, GC_OFFSET_AUTO_DERIVATIVE, 0).toDouble();
@@ -55,6 +55,9 @@ TrainerOffset::readConfig()
 long
 TrainerOffset::adjustLoad(long load, double power)
 {
+    double        smoothedPower;
+    static double lastPower;
+
     if ((load == 0) || (power == 0)) {
         // reset everything & no adjustment if either power or load
         // are zero, else just likely to max out the terms
@@ -76,7 +79,13 @@ TrainerOffset::adjustLoad(long load, double power)
 
         case GC_OFFSET_TYPE_AUTO:
 
-            error = load - power;
+            // apply simple exponential smoothing (exponentially weighted moving average)
+            smoothedPower = (config.smoothing * power) + ((1.0 - config.smoothing) * lastPower);
+            lastPower = smoothedPower;
+
+            //qDebug() << "Smoothed power:" << smoothedPower;
+
+            error = load - smoothedPower;
             integralSum += error;
 
             proportionalTerm = config.proportionalConstant * error;

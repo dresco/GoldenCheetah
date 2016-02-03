@@ -387,8 +387,8 @@ class TrainerOffsetPage : public QWidget
         TrainerOffset  *offset;
         Context        *context;
         QComboBox      *type;
-        QSpinBox       *percent, *watts, *smoothing;
-        QDoubleSpinBox *proportional, *integral, *derivative;
+        QSpinBox       *percent, *watts;
+        QDoubleSpinBox *proportional, *integral, *derivative, *smoothing;
 };
 
 class BestsMetricsPage : public QWidget
