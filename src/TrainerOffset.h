@@ -41,7 +41,6 @@ typedef struct {
 class TrainerOffset
 {
     private:
-        double          adjustedLoad;
         double          proportionalTerm, integralTerm, derivativeTerm, adjustment;
         double          error, lastError, integralSum;
 
@@ -50,7 +49,7 @@ class TrainerOffset
         long            adjustLoad(long load, double power);
         void            writeConfig();
         void            readConfig();
-        void            getStatistics(double *err, double *adj, double *l, double *p, double *i, double *d);
+        void            getStatistics(double *err, double *adj, double *p, double *i, double *d);
 
         Configuration_t config;
 };

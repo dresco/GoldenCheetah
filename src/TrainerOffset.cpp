@@ -64,17 +64,16 @@ TrainerOffset::adjustLoad(long load, double power)
         error = lastError = adjustment = integralSum = 0;
         proportionalTerm = integralTerm = derivativeTerm = 0;
 
-        adjustedLoad = load;
-        return (long)adjustedLoad;
+        return 0;
     }
 
     switch (config.type) {
         case GC_OFFSET_TYPE_NONE:
-            adjustedLoad = load;
+            adjustment = 0;
             break;
 
         case GC_OFFSET_TYPE_MANUAL:
-            adjustedLoad = ((load * config.percent) / 100) + config.watts;
+            adjustment = ((load * config.percent)/100.0) + config.watts - load;
             break;
 
         case GC_OFFSET_TYPE_AUTO:
@@ -94,30 +93,24 @@ TrainerOffset::adjustLoad(long load, double power)
 
             // todo:  prevent integral from winding up
 
-            adjustment   = proportionalTerm + integralTerm + derivativeTerm;
-            adjustedLoad += adjustment;
+            adjustment = proportionalTerm + integralTerm + derivativeTerm;
 
             lastError = error;
             break;
 
         default:
-            adjustedLoad = load;
+            adjustment = 0;
             break;
     }
 
-    // bound the load as we do elsewhere..
-    if (adjustedLoad > 1500) adjustedLoad = 1500;
-    if (adjustedLoad < 50) adjustedLoad = 50;
-
-    return (long)adjustedLoad;
+    return (long)adjustment;
 }
 
 void
-TrainerOffset::getStatistics(double *err, double *adj, double *l, double *p, double *i, double *d)
+TrainerOffset::getStatistics(double *err, double *adj, double *p, double *i, double *d)
 {
     *err = error;
     *adj = adjustment;
-    *l   = adjustedLoad;
     *p   = proportionalTerm;
     *i   = integralTerm;
     *d   = derivativeTerm;

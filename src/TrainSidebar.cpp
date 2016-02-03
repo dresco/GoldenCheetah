@@ -1787,11 +1787,12 @@ void TrainSidebar::loadUpdate()
     }
 
     // Adjust trainer load if required
-    adjustedLoad = offset->adjustLoad(displayLoad, displayPower);
-    offset->getStatistics(&error, &adjustment, &adjustedLoad, &proportionalTerm, &integralTerm, &derivativeTerm);
+
+    adjustedLoad = displayLoad + offset->adjustLoad(displayLoad, displayPower);
+    offset->getStatistics(&error, &adjustment, &proportionalTerm, &integralTerm, &derivativeTerm);
     qDebug() << "AdjL:" << qPrintable(QString::number(adjustedLoad, 'f', 2)) <<
-                "Err:"  << qPrintable(QString::number(error, 'f', 2)) <<
                 "Adj:"  << qPrintable(QString::number(adjustment, 'f', 2)) <<
+                "Err:"  << qPrintable(QString::number(error, 'f', 2)) <<
                 "P:"    << qPrintable(QString::number(proportionalTerm, 'f', 2)) <<
                 "I:"    << qPrintable(QString::number(integralTerm, 'f', 2)) <<
                 "D:"    << qPrintable(QString::number(derivativeTerm, 'f', 2));
